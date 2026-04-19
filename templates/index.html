@@ -1601,8 +1601,9 @@
       box-shadow: var(--s-sm);
       width: 100%;
       box-sizing: border-box;
-      overflow-y: auto;
+      overflow: auto;
       max-height: 600px;
+      width: 100%;
       min-height: 0;
 }
     .c-grid-container:hover {
@@ -2939,18 +2940,25 @@
         const gridOuter = document.createElement('div');
         gridOuter.className = 'grid-outer';
         gridOuter.style.transform = `scale(${scale})`;
-        gridOuter.style.transformOrigin = 'top center';
+        gridOuter.style.transformOrigin = 'top left'; // Use top left to make scrolling logic simpler
+        gridOuter.style.width = 'max-content';
         
         // Calculate height adjustment to prevent vertical gap
         const baseHeight = (ROWS * 25); // Approximate cell height if not variable
         // However, it's better to let the container clip or use a container with relative height
         // But the user wants them fully contained. 
         // We'll set a fixed height for the holder based on the scale to avoid overflow
-        const scaledHeight = (ROWS * 23 * scale); 
+        const scaledHeight = (ROWS * 25 * scale); // Increased multiplier for safety
         gridHolder.style.height = `${scaledHeight + 40}px`;
+        gridHolder.style.overflow = 'visible'; // Let the card handle scrolling
+        gridHolder.style.width = 'max-content';
+        gridHolder.style.minWidth = '100%';
 
         const gridEl = document.createElement('div');
         gridEl.style.display = 'grid';
+        gridEl.style.gap = '1px';
+        gridEl.style.background = 'var(--cell-gap)';
+        gridEl.style.width = 'max-content';
         const cs = getComputedStyle(document.documentElement).getPropertyValue('--cell-size').trim();
         gridEl.style.gridTemplateColumns = `repeat(${COLS}, ${cs})`;
         

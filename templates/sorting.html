@@ -1754,6 +1754,11 @@
          <button class="solve-btn" id="solve-btn" onclick="runSorting()">▶ Sort</button>
          <button class="t-btn" id="gen-btn" onclick="genArray()">↻ New Array</button>
          <div class="t-sep"></div>
+         <div class="step-controls" id="step-controls" style="display:none; margin-left:10px;">
+            <button class="step-btn" id="btn-prev" onclick="doStepPrev()">⏮ Prev</button>
+            <button class="step-btn" id="btn-play" onclick="togglePlay()">⏸ Pause</button>
+            <button class="step-btn" id="btn-next" onclick="doStepNext()">Next ⏭</button>
+         </div>
          <div class="speed-wrap">
            <span>Size</span>
            <input type="range" id="arr-size" min="10" max="250" value="80" oninput="genArray()">
@@ -1776,7 +1781,7 @@
          <span style="font-size:10px;font-weight:700;color:var(--text-3);">Algos:</span>
          <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-merge" checked onchange="if(!playing) renderCompareContainers()"> Merge</label>
          <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-quick" checked onchange="if(!playing) renderCompareContainers()"> Quick</label>
-         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-heap" checked onchange="if(!playing) renderCompareContainers()"> Heap</label>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-heap" onchange="if(!playing) renderCompareContainers()"> Heap</label>
          <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-insertion" onchange="if(!playing) renderCompareContainers()"> Insert</label>
          <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-selection" onchange="if(!playing) renderCompareContainers()"> Select</label>
          <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-bubble" onchange="if(!playing) renderCompareContainers()"> Bubble</label>
@@ -1787,6 +1792,7 @@
       <div id="status-strip" class="status-strip" style="width:100%; border-left:none; border-right:none; text-align:center;">Select an algorithm and click Sort.</div>
 
       <div class="grid-wrap" style="flex-direction:column; padding: 20px;">
+        <div id="live-subtitle" class="live-subtitle" style="display:none; font-family:var(--font-display); font-size:16px; font-weight:700; margin-bottom:15px; color:var(--text); text-align:center;">Ready to sort.</div>
         <div id="visual-container" style="display:flex; width:100%; height:100%; align-items:flex-end; justify-content:center; gap: 2px;">
         </div>
         <div id="compare-container" style="display:none; width:100%; height:100%; flex-wrap:wrap; gap: 10px; overflow-y:auto; justify-content:center;">
@@ -1904,7 +1910,12 @@
     let isCompareMode = false;
     let playing = false;
     let frames = [];
+    let isPaused = false;
+    let isStepping = false;
+    let frameIdx = 0;
+    let virtualArray = [];
     
+    function stopRunning() { playing = false; isPaused = false; isStepping = false; }
     function setStatus(msg) { document.getElementById('status-strip').textContent = msg; }
     function sl(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -1935,7 +1946,9 @@
     }
 
     function sel(a) {
-      if(playing) return;
+      if(playing && !isPaused) return;
+      stopRunning();
+      if(isCompareMode) closeCompareMode();
       document.querySelectorAll('.algo-btn').forEach(e => e.classList.remove('active'));
       document.getElementById('btn-' + a).classList.add('active');
       activeAlgo = a;
@@ -1944,13 +1957,16 @@
     }
 
     function toggleCompareMode() {
-      if(playing) return;
+      if(playing && !isPaused) return;
+      stopRunning();
       isCompareMode = true;
       document.getElementById('main-toolbar').style.display = 'none';
       document.getElementById('compare-toolbar').style.display = 'flex';
       document.getElementById('visual-container').style.display = 'none';
       document.getElementById('compare-container').style.display = 'flex';
       document.getElementById('compare-results').style.display = 'none';
+      const sub = document.getElementById('live-subtitle');
+      if (sub) sub.style.display = 'none';
       
       document.querySelectorAll('.algo-btn').forEach(e => e.classList.remove('active'));
       document.getElementById('btn-compare-mode').classList.add('active');
@@ -1959,27 +1975,35 @@
     }
 
     function closeCompareMode() {
-      if(playing) return;
+      if(playing && !isPaused) return;
+      stopRunning();
       isCompareMode = false;
       document.getElementById('main-toolbar').style.display = 'flex';
       document.getElementById('compare-toolbar').style.display = 'none';
       document.getElementById('visual-container').style.display = 'flex';
       document.getElementById('compare-container').style.display = 'none';
       document.getElementById('compare-results').style.display = 'none';
-      sel('merge');
+      const sub = document.getElementById('live-subtitle');
+      if (sub) sub.style.display = 'block';
+      
+      document.querySelectorAll('.algo-btn').forEach(e => e.classList.remove('active'));
+      document.getElementById('btn-' + activeAlgo).classList.add('active');
+      renderArray();
+      setStatus("Select an algorithm and click Sort.");
     }
 
     function genArray() {
-      if(playing) return;
+      if(playing && !isPaused) return;
+      stopRunning();
       let size = parseInt(document.getElementById('arr-size').value) || 50;
-      if(isCompareMode) size = Math.floor(Math.random() * 5) + 6;
+      if(isCompareMode) size = Math.floor(Math.random() * 15) + 15;
       array = [];
       const min = 5, max = 100;
       for(let i=0; i<size; i++) {
           array.push(Math.floor(Math.random()*(max-min+1))+min);
       }
       const ca = document.getElementById('custom-array');
-      if(ca) ca.value = isCompareMode ? array.join(', ') : '';
+      if(ca) ca.value = '';
       const cn = document.getElementById('custom-array-normal');
       if(cn) cn.value = '';
       
@@ -2009,6 +2033,12 @@
           container.appendChild(bar);
       });
       setStatus("Array initialized. Click Sort to begin.");
+      document.getElementById('step-controls').style.display = 'none';
+      const sub = document.getElementById('live-subtitle');
+      if (sub && !isCompareMode) {
+          sub.style.display = 'block';
+          sub.textContent = 'Ready to sort.';
+      }
     }
 
     function getCompareAlgos() {
@@ -2021,7 +2051,8 @@
 
     function renderCompareContainers() {
         const custVal = document.getElementById('custom-array').value;
-        const arr = custVal ? custVal.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x)) : [];
+        let arr = custVal ? custVal.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x)) : array;
+        if (arr.length === 0) arr = array;
         
         const algos = getCompareAlgos();
         const sc = document.getElementById('compare-container');
@@ -2045,9 +2076,178 @@
         document.getElementById('compare-results').style.display = 'none';
     }
 
+    function updateSubtitle(f, vArr) {
+        const subEl = document.getElementById('live-subtitle');
+        if (!subEl || isCompareMode) return;
+        if (!f) { subEl.textContent = "Ready to sort."; return; }
+        
+        let vi = vArr[f.i];
+        let vj = f.j !== undefined ? vArr[f.j] : null;
+
+        if (f.t === 'compare') {
+            subEl.innerHTML = `Comparing <b style="color:var(--path)">${vi}</b> and <b style="color:var(--path)">${vj}</b>...`;
+        } else if (f.t === 'swap') {
+            subEl.innerHTML = `Swapping <b style="color:var(--stop)">${vi}</b> and <b style="color:var(--stop)">${vj}</b>.`;
+        } else if (f.t === 'set') {
+            subEl.innerHTML = `Setting position ${f.i} to <b style="color:var(--go)">${f.v}</b>.`;
+        }
+    }
+
+    function updateStepControls() {
+        document.getElementById('step-controls').style.display = 'flex';
+        document.getElementById('btn-play').textContent = isPaused ? "▶ Play" : "⏸ Pause";
+        document.getElementById('btn-prev').disabled = isStepping || (!isPaused) || (frameIdx === 0);
+        document.getElementById('btn-next').disabled = isStepping || (!isPaused) || (frameIdx >= frames.length);
+        document.getElementById('btn-play').disabled = isStepping || (isPaused && frameIdx >= frames.length);
+        document.getElementById('solve-btn').textContent = isPaused ? "▶ Sort" : "Sorting...";
+        if(isPaused) document.getElementById('solve-btn').classList.remove('active');
+        else document.getElementById('solve-btn').classList.add('active');
+    }
+
+    async function executeFrame(f, vArr, delay) {
+        if (!playing) return;
+        const maxVal = Math.max(...array, 1);
+        const bi = document.getElementById('b-'+f.i);
+        const bj = f.j !== undefined ? document.getElementById('b-'+f.j) : null;
+
+        if (f.t === 'compare') {
+            if (bi) bi.style.background = 'var(--path)';
+            if (bj) bj.style.background = 'var(--path)';
+            if (delay) await sl(delay);
+            if (bi) bi.style.background = '';
+            if (bj) bj.style.background = '';
+        } else if (f.t === 'swap') {
+            let temp = vArr[f.i];
+            vArr[f.i] = vArr[f.j];
+            vArr[f.j] = temp;
+            if (bi && bj) {
+                bi.style.height = ((vArr[f.i] / maxVal) * 100) + '%';
+                bj.style.height = ((vArr[f.j] / maxVal) * 100) + '%';
+                bi.style.background = 'var(--stop)';
+                bj.style.background = 'var(--stop)';
+                if (delay) await sl(delay);
+                bi.style.background = '';
+                bj.style.background = '';
+            }
+        } else if (f.t === 'set') {
+            vArr[f.i] = f.v;
+            if (bi) {
+                bi.style.height = ((vArr[f.i] / maxVal) * 100) + '%';
+                bi.style.background = 'var(--go)';
+                if (delay) await sl(delay);
+                bi.style.background = '';
+            }
+        }
+    }
+
+    async function stepNext() {
+        if (frameIdx < frames.length && playing) {
+            let f = frames[frameIdx];
+            updateSubtitle(f, virtualArray);
+
+            let delayBase = 101 - document.getElementById('arr-speed').value;
+            let delay = isPaused ? 300 : (delayBase < 5 ? delayBase / 2 : delayBase);
+
+            await executeFrame(f, virtualArray, delay);
+            frameIdx++;
+        }
+    }
+
+    async function togglePlay() {
+        if (frameIdx >= frames.length) return;
+        isPaused = !isPaused;
+        updateStepControls();
+        if (!isPaused) {
+            while(playing && !isPaused && frameIdx < frames.length) {
+                await stepNext();
+            }
+            if (playing && !isPaused && frameIdx >= frames.length) {
+                document.getElementById('live-subtitle').textContent = "Sorting Complete.";
+                finishSortUI();
+            }
+        }
+    }
+
+    async function doStepNext() {
+        if (isStepping || frameIdx >= frames.length) return;
+        isStepping = true;
+        updateStepControls();
+        
+        await stepNext();
+        
+        if (frameIdx < frames.length) {
+            updateSubtitle(frames[frameIdx], virtualArray);
+        } else {
+            document.getElementById('live-subtitle').textContent = "Sorting Complete.";
+            finishSortUI();
+        }
+        
+        isStepping = false;
+        updateStepControls();
+    }
+
+    function fastForwardTo(targetIdx) {
+        virtualArray = [...array];
+        for (let i = 0; i < targetIdx; i++) {
+            let f = frames[i];
+            if (f.t === 'swap') {
+                let temp = virtualArray[f.i];
+                virtualArray[f.i] = virtualArray[f.j];
+                virtualArray[f.j] = temp;
+            } else if (f.t === 'set') {
+                virtualArray[f.i] = f.v;
+            }
+        }
+        const maxVal = Math.max(...array, 1);
+        for (let i = 0; i < virtualArray.length; i++) {
+            const b = document.getElementById('b-'+i);
+            if (b) {
+                b.style.height = ((virtualArray[i] / maxVal) * 100) + '%';
+                b.style.background = '';
+                b.classList.remove('sorted');
+            }
+        }
+    }
+
+    async function doStepPrev() {
+        if (isStepping || frameIdx === 0) return;
+        isStepping = true;
+        frameIdx--;
+        fastForwardTo(frameIdx);
+        updateSubtitle(frameIdx >= 0 && frameIdx < frames.length ? frames[frameIdx] : null, virtualArray);
+        isStepping = false;
+        updateStepControls();
+    }
+
+    async function finishSortUI() {
+        let delay = 101 - document.getElementById('arr-speed').value;
+        for(let i=0; i<array.length; i++) {
+            if(document.getElementById('b-'+i) && playing) {
+                document.getElementById('b-'+i).classList.add('sorted');
+                if (delay > 10) await sl(10);
+            }
+        }
+        setStatus(`Sort Complete!`);
+        playing = false;
+        isPaused = false;
+        updateStepControls();
+        document.getElementById('solve-btn').textContent = "▶ Sort";
+        document.getElementById('solve-btn').classList.remove('active');
+        document.getElementById('step-controls').style.display = 'none';
+        document.getElementById('live-subtitle').textContent = "Ready to sort.";
+    }
+
     async function runSorting() {
-        if(playing) return;
+        if(playing && !isPaused) return;
         playing = true;
+        isPaused = false;
+        frameIdx = 0;
+        virtualArray = [...array];
+        
+        for(let i=0; i<array.length; i++) {
+            if(document.getElementById('b-'+i)) document.getElementById('b-'+i).classList.remove('sorted');
+        }
+
         document.getElementById('solve-btn').textContent = "Sorting...";
         document.getElementById('solve-btn').classList.add('active');
         setStatus("Fetching algorithm execution from Python...");
@@ -2060,58 +2260,23 @@
             const data = await res.json();
             
             setStatus(`Sorting animated... (Python executed in ${data.timeMs}ms)`);
-            const frames = data.frames;
-            
-            let delay = 101 - document.getElementById('arr-speed').value;
-            if(delay < 5) delay = delay / 2;
+            frames = data.frames;
+            updateStepControls();
 
-            for(let f of frames) {
-                if(f.t === 'compare') {
-                    if (document.getElementById('b-'+f.i)) document.getElementById('b-'+f.i).style.background = 'var(--path)';
-                    if (document.getElementById('b-'+f.j)) document.getElementById('b-'+f.j).style.background = 'var(--path)';
-                    if (delay > 2) await sl(delay);
-                    if (document.getElementById('b-'+f.i)) document.getElementById('b-'+f.i).style.background = '';
-                    if (document.getElementById('b-'+f.j)) document.getElementById('b-'+f.j).style.background = '';
-                } else if(f.t === 'swap') {
-                    const bi = document.getElementById('b-'+f.i);
-                    const bj = document.getElementById('b-'+f.j);
-                    if(bi && bj) {
-                        const h = bi.style.height;
-                        bi.style.height = bj.style.height;
-                        bj.style.height = h;
-                        bi.style.background = 'var(--stop)';
-                        bj.style.background = 'var(--stop)';
-                        if (delay > 2) await sl(delay);
-                        bi.style.background = '';
-                        bj.style.background = '';
-                    }
-                } else if(f.t === 'set') {
-                    const bi = document.getElementById('b-'+f.i);
-                    if(bi) {
-                        bi.style.height = ((f.v / Math.max(...array)) * 100) + '%';
-                        bi.style.background = 'var(--go)';
-                        if (delay > 2) await sl(delay);
-                        bi.style.background = '';
-                    }
-                }
+            while(playing && !isPaused && frameIdx < frames.length) {
+                await stepNext();
             }
-            
-            // Validation sweep
-            for(let i=0; i<array.length; i++) {
-                if(document.getElementById('b-'+i)) {
-                    document.getElementById('b-'+i).classList.add('sorted');
-                    if (delay > 10) await sl(10);
-                }
+            if (playing && !isPaused && frameIdx >= frames.length) {
+                document.getElementById('live-subtitle').textContent = "Sorting Complete.";
+                finishSortUI();
             }
-            setStatus(`Sort Complete! Python time: ${data.timeMs}ms`);
             
         } catch(e) {
             setStatus("Error executing algorithm in backend.");
+            playing = false;
+            document.getElementById('solve-btn').textContent = "▶ Sort";
+            document.getElementById('solve-btn').classList.remove('active');
         }
-        
-        playing = false;
-        document.getElementById('solve-btn').textContent = "▶ Sort";
-        document.getElementById('solve-btn').classList.remove('active');
     }
 
     async function runCompare() {
@@ -2120,7 +2285,8 @@
         if(algos.length < 2) { setStatus("Select at least 2 algorithms."); return; }
         
         const custVal = document.getElementById('custom-array').value;
-        const arr = custVal ? custVal.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x)) : [];
+        let arr = custVal ? custVal.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x)) : array;
+        if(arr.length === 0) arr = array;
         if(arr.length === 0) { setStatus("Array is empty."); return; }
 
         playing = true;
@@ -2164,17 +2330,36 @@
         const animPromises = responses.map(async r => {
             let delay = 10;
             for(let f of r.frames) {
-                if(f.t === 'swap') {
+                if(f.t === 'compare') {
+                    const bi = document.getElementById(`cb-${r.algo}-${f.i}`);
+                    const bj = document.getElementById(`cb-${r.algo}-${f.j}`);
+                    if(bi && bj) {
+                        bi.style.background = 'var(--path)';
+                        bj.style.background = 'var(--path)';
+                        if(delay) await sl(delay);
+                        bi.style.background = '';
+                        bj.style.background = '';
+                    }
+                } else if(f.t === 'swap') {
                     const bi = document.getElementById(`cb-${r.algo}-${f.i}`);
                     const bj = document.getElementById(`cb-${r.algo}-${f.j}`);
                     if(bi && bj) {
                         const h = bi.style.height; bi.style.height = bj.style.height; bj.style.height = h;
+                        bi.style.background = 'var(--stop)';
+                        bj.style.background = 'var(--stop)';
+                        if(delay) await sl(delay);
+                        bi.style.background = '';
+                        bj.style.background = '';
                     }
                 } else if(f.t === 'set') {
                     const bi = document.getElementById(`cb-${r.algo}-${f.i}`);
-                    if(bi) bi.style.height = ((f.v / maxVal) * 100) + '%';
+                    if(bi) {
+                        bi.style.height = ((f.v / maxVal) * 100) + '%';
+                        bi.style.background = 'var(--go)';
+                        if(delay) await sl(delay);
+                        bi.style.background = '';
+                    }
                 }
-                if(delay) await sl(delay);
             }
             // Sweep
             for(let i=0; i<arr.length; i++) {

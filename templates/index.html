@@ -800,6 +800,7 @@
     .cell {
       width: var(--cell-size);
       height: var(--cell-size);
+      aspect-ratio: 1 / 1;
       background: var(--cell-bg);
       transition: background 0.04s;
       position: relative;
@@ -1643,7 +1644,8 @@
       padding: 20px;
       align-items: start;
       width: 100%;
-      height: 100%;
+      flex: 1;
+      min-height: 0;
       box-sizing: border-box;
     }
     @media (max-width: 900px) {
@@ -2914,7 +2916,12 @@
     function renderCompareGrids() {
       const algos = getSelectedCompareAlgos();
       const wrap = document.getElementById('compare-grid-wrap');
-      wrap.innerHTML = '';
+      
+      // Clear previous grids but keep results table
+      document.querySelectorAll('.c-grid-container').forEach(e => e.remove());
+      const resTable = document.getElementById('compare-results');
+      if (resTable) resTable.style.display = 'none';
+
       compareData = [];
 
       // Determine scale based on count
@@ -2963,6 +2970,7 @@
         gridEl.style.width = 'max-content';
         const cs = getComputedStyle(document.documentElement).getPropertyValue('--cell-size').trim();
         gridEl.style.gridTemplateColumns = `repeat(${COLS}, ${cs})`;
+        gridEl.style.gridAutoRows = cs;
         
         const algoCells = [];
         for (let r = 0; r < ROWS; r++) {
@@ -3094,7 +3102,9 @@
             <td>${r.stats.found ? r.stats.pathLength : '—'}</td>
           </tr>`;
         });
-        document.getElementById('compare-results').style.display = 'block';
+        const resultsEl = document.getElementById('compare-results');
+        resultsEl.style.display = 'block';
+        document.getElementById('compare-grid-wrap').prepend(resultsEl); 
         setStatus("Race complete!", "ok");
 
       } catch (e) {

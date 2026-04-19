@@ -2933,26 +2933,28 @@
         title.innerHTML = `<span>${info.name}</span><span id="c-stat-${algo}" class="c-grid-stats"></span>`;
         container.appendChild(title);
 
-        // Container to help with scaling without affecting outer flow
-        const gridHolder = document.createElement('div');
-        gridHolder.style.cssText = `width: 100%; display: flex; justify-content: flex-start;`;
+        const cellSize = 18; // Known from CSS
+        const gap = 1;
+        const totalUnscaledWidth = COLS * cellSize + (COLS - 1) * gap;
+        const totalUnscaledHeight = ROWS * cellSize + (ROWS - 1) * gap;
+
+        // Container to ensure scrollbars match the visually scaled size
+        const trueSizer = document.createElement('div');
+        trueSizer.style.width = `${totalUnscaledWidth * scale}px`;
+        trueSizer.style.height = `${totalUnscaledHeight * scale}px`;
+        trueSizer.style.position = 'relative';
+        trueSizer.style.overflow = 'visible';
+        container.appendChild(trueSizer);
 
         const gridOuter = document.createElement('div');
         gridOuter.className = 'grid-outer';
         gridOuter.style.transform = `scale(${scale})`;
-        gridOuter.style.transformOrigin = 'top left'; // Use top left to make scrolling logic simpler
-        gridOuter.style.width = 'max-content';
+        gridOuter.style.transformOrigin = 'top left'; 
+        gridOuter.style.width = `${totalUnscaledWidth}px`;
+        gridOuter.style.height = `${totalUnscaledHeight}px`;
+        trueSizer.appendChild(gridOuter);
         
-        // Calculate height adjustment to prevent vertical gap
-        const baseHeight = (ROWS * 25); // Approximate cell height if not variable
-        // However, it's better to let the container clip or use a container with relative height
-        // But the user wants them fully contained. 
-        // We'll set a fixed height for the holder based on the scale to avoid overflow
-        const scaledHeight = (ROWS * 25 * scale); // Increased multiplier for safety
-        gridHolder.style.height = `${scaledHeight + 40}px`;
-        gridHolder.style.overflow = 'visible'; // Let the card handle scrolling
-        gridHolder.style.width = 'max-content';
-        gridHolder.style.minWidth = '100%';
+
 
         const gridEl = document.createElement('div');
         gridEl.style.display = 'grid';
@@ -2985,8 +2987,6 @@
           }
         }
         gridOuter.appendChild(gridEl);
-        gridHolder.appendChild(gridOuter);
-        container.appendChild(gridHolder);
         wrap.appendChild(container);
 
         compareData.push({ algo, cells: algoCells, visited: [], path: [], stats: null });

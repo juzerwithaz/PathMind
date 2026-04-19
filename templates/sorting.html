@@ -1,0 +1,2185 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PathMind — AI Pathfinding Visualizer</title>
+  <meta name="description" content="Interactive pathfinding algorithm visualizer with BFS, DFS, UCS, DLS, A*, Greedy. Features weighted terrain, portals, waypoints, benchmarking and more.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,700;0,800;1,300&family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;600&display=swap"
+    rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* ── Tokens ──────────────────────────────────────────────────── */
+    :root {
+      --font-display: 'Syne', sans-serif;
+      --font-body: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --ink: #0f0e0d;
+      --hdr-bg: #0f0e0d;
+      --hdr-fg: #ffffff;
+      --paper: #f2efe8;
+      --paper2: #e8e4db;
+      --paper3: #ddd9cf;
+      --rule: #c8c3b8;
+      --rule2: #b0aba0;
+
+      --text: #0f0e0d;
+      --text-2: #5a5650;
+      --text-3: #9a958e;
+
+      --hi: #e8380d;
+      /* hot tomato accent */
+      --hi-light: rgba(232, 56, 13, 0.08);
+      --hi-mid: rgba(232, 56, 13, 0.18);
+
+      --go: #1a7a4a;
+      --stop: #c0321a;
+      --path: #d97706;
+
+      --sand-color: #e8c96a;
+      --water-color: #4a9ece;
+      --forest-color: #2d8a4e;
+      --waypoint-color: #8b5cf6;
+      --portal-color: #ec4899;
+
+      --cell-size: 18px;
+      --cell-bg: #ede9e1;
+      --cell-wall: #b0aba0;
+      --cell-gap: #c8c3b8;
+
+      --s-sm: 0 1px 0 rgba(0, 0, 0, 0.06);
+      --s-md: 0 2px 12px rgba(0, 0, 0, 0.1);
+      --s-lg: 0 8px 32px rgba(0, 0, 0, 0.14);
+
+      --r: 0px;
+    }
+
+    [data-theme="dark"] {
+      --ink: #f0ece4;
+      --hdr-bg: #1a1714;
+      --hdr-fg: #f0ece4;
+      --paper: #131210;
+      --paper2: #1c1a17;
+      --paper3: #252320;
+      --rule: #2e2b27;
+      --rule2: #3d3a35;
+
+      --text: #f0ece4;
+      --text-2: #8a8680;
+      --text-3: #504d49;
+
+      --hi: #ff5533;
+      --hi-light: rgba(255, 85, 51, 0.1);
+      --hi-mid: rgba(255, 85, 51, 0.2);
+
+      --go: #22c55e;
+      --stop: #ef4444;
+      --path: #fbbf24;
+
+      --sand-color: #c9a044;
+      --water-color: #3d7ea8;
+      --forest-color: #1f6b3a;
+      --waypoint-color: #a78bfa;
+      --portal-color: #f472b6;
+
+      --cell-bg: #1a1814;
+      --cell-wall: #3d3a35;
+      --cell-gap: #252320;
+
+      --s-sm: 0 1px 0 rgba(0, 0, 0, 0.3);
+      --s-md: 0 2px 16px rgba(0, 0, 0, 0.5);
+      --s-lg: 0 8px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    /* ── Base ─────────────────────────────────────────────────────── */
+    html,
+    body {
+      font-family: var(--font-body);
+      background: var(--paper);
+      color: var(--text);
+      height: 100%;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: stretch;
+      height: 50px;
+      background: var(--hdr-bg);
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .logo-block {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 0 20px;
+      border-right: 1px solid color-mix(in srgb, var(--hdr-fg) 10%, transparent);
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo-text {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--hdr-fg);
+      letter-spacing: -0.5px;
+      line-height: 1;
+    }
+
+    .logo-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--hi);
+      border-radius: 50%;
+      margin-left: 3px;
+      margin-bottom: 12px;
+      animation: pulse-dot 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.5;
+        transform: scale(0.7);
+      }
+    }
+
+    .header-algo-pill {
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      border-right: 1px solid color-mix(in srgb, var(--hdr-fg) 10%, transparent);
+      position: relative;
+      z-index: 1;
+    }
+
+    .algo-running-label {
+      font-family: var(--font-body);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: color-mix(in srgb, var(--hdr-fg) 45%, transparent);
+    }
+
+    .algo-running-name {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--hdr-fg);
+      margin-left: 8px;
+      transition: color 0.2s;
+    }
+
+    .header-right {
+      margin-left: auto;
+      display: flex;
+      align-items: stretch;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hdr-btn {
+      all: unset;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 16px;
+      border-left: 1px solid color-mix(in srgb, var(--hdr-fg) 12%, transparent);
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 600;
+      color: color-mix(in srgb, var(--hdr-fg) 50%, transparent);
+      letter-spacing: 0.3px;
+      transition: color 0.15s, background 0.15s;
+      gap: 6px;
+    }
+
+    .hdr-btn:hover {
+      color: var(--hdr-fg);
+      background: color-mix(in srgb, var(--hdr-fg) 6%, transparent);
+    }
+
+    .theme-icon {
+      font-size: 14px;
+    }
+
+    .menu-hdr-btn {
+      display: none;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────────── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Left Panel ───────────────────────────────────────────────── */
+    .left-panel {
+      width: 224px;
+      min-width: 224px;
+      background: var(--paper2);
+      border-right: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      transition: transform 0.25s cubic-bezier(.4, 0, .2, 1), background 0.3s;
+      z-index: 20;
+      scrollbar-width: thin;
+      scrollbar-color: var(--rule) transparent;
+    }
+
+    .panel-head {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .panel-head-label {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+
+    .algo-list {
+      display: flex;
+      flex-direction: column;
+      padding: 8px;
+      gap: 2px;
+    }
+
+    .algo-btn {
+      all: unset;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-2);
+      border: 1px solid transparent;
+      transition: all 0.12s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .algo-btn::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 2px;
+      height: 100%;
+      background: currentColor;
+      transform: scaleY(0);
+      transform-origin: center;
+      transition: transform 0.15s;
+      opacity: 0.6;
+    }
+
+    .algo-btn:hover {
+      color: var(--text);
+      background: var(--paper3);
+    }
+
+    .algo-btn.active {
+      color: var(--hi);
+      background: var(--hi-light);
+      border-color: var(--hi-mid);
+    }
+
+    .algo-btn.active::after {
+      transform: scaleY(1);
+    }
+
+    .a-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: transform 0.15s;
+    }
+
+    .algo-btn.active .a-dot {
+      transform: scale(1.4);
+    }
+
+    .a-abbr {
+      margin-left: auto;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      opacity: 0.35;
+    }
+
+    /* Info panel */
+    .info-panel {
+      border-top: 1px solid var(--rule);
+      flex: 1;
+    }
+
+    .info-inner {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .algo-title-display {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1.2;
+      letter-spacing: -0.3px;
+      transition: color 0.2s;
+    }
+
+    .algo-desc {
+      font-size: 11px;
+      line-height: 1.75;
+      color: var(--text-2);
+      font-weight: 400;
+      font-style: italic;
+    }
+
+    .complexity-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .cx-card {
+      padding: 8px 10px;
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      position: relative;
+    }
+
+    .cx-label {
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      margin-bottom: 4px;
+    }
+
+    .cx-val {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .prop-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .prop-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      border: 1px solid;
+      letter-spacing: 0.5px;
+    }
+
+    .prop-yes {
+      border-color: var(--go);
+      color: var(--go);
+      background: rgba(26, 122, 74, 0.07);
+    }
+
+    .prop-no {
+      border-color: var(--stop);
+      color: var(--stop);
+      background: rgba(192, 50, 26, 0.07);
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .tag {
+      padding: 2px 7px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: var(--paper3);
+      color: var(--text-3);
+      border: 1px solid var(--rule);
+    }
+
+    /* ── Backdrop ─────────────────────────────────────────────────── */
+    .backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 15;
+    }
+
+    /* ── Center ───────────────────────────────────────────────────── */
+    .center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 12px;
+      overflow: hidden;
+      background: var(--paper);
+      transition: background 0.3s;
+      min-width: 0;
+    }
+
+    /* ── Mobile algo strip ────────────────────────────────────────── */
+    .algo-strip {
+      display: none;
+      width: 100%;
+      overflow-x: auto;
+      gap: 4px;
+      flex-shrink: 0;
+      scrollbar-width: none;
+    }
+
+    .algo-strip::-webkit-scrollbar {
+      display: none;
+    }
+
+    .strip-chip {
+      all: unset;
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+      padding: 5px 12px;
+      border: 1px solid var(--rule);
+      color: var(--text-2);
+      background: var(--paper2);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+      transition: all 0.12s;
+      letter-spacing: 0.3px;
+    }
+
+    .strip-chip.active {
+      border-color: var(--hi);
+      color: var(--hi);
+      background: var(--hi-light);
+    }
+
+    /* ── Toolbars ─────────────────────────────────────────────────── */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      flex-shrink: 0;
+    }
+
+    .t-btn {
+      all: unset;
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 5px 10px;
+      border: 1px solid var(--rule);
+      color: var(--text-2);
+      background: var(--paper2);
+      transition: all 0.1s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      letter-spacing: 0.2px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .t-btn:hover {
+      border-color: var(--rule2);
+      color: var(--text);
+    }
+
+    .t-btn>* {
+      position: relative;
+      z-index: 1;
+    }
+
+    .t-btn.active {
+      border-color: var(--text-2);
+      color: var(--text);
+      background: var(--paper3);
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .t-btn.wall-active {
+      border-color: var(--rule2);
+      color: var(--text);
+      background: var(--paper3);
+    }
+
+    .t-btn.go-active {
+      border-color: var(--go);
+      color: var(--go);
+      background: rgba(26, 122, 74, 0.08);
+    }
+
+    .t-btn.stop-active {
+      border-color: var(--stop);
+      color: var(--stop);
+      background: rgba(192, 50, 26, 0.08);
+    }
+
+    .t-btn.sand-active {
+      border-color: var(--sand-color);
+      color: var(--sand-color);
+      background: rgba(232, 201, 106, 0.12);
+    }
+
+    .t-btn.water-active {
+      border-color: var(--water-color);
+      color: var(--water-color);
+      background: rgba(74, 158, 206, 0.12);
+    }
+
+    .t-btn.forest-active {
+      border-color: var(--forest-color);
+      color: var(--forest-color);
+      background: rgba(45, 138, 78, 0.12);
+    }
+
+    .t-btn.waypoint-active {
+      border-color: var(--waypoint-color);
+      color: var(--waypoint-color);
+      background: rgba(139, 92, 246, 0.12);
+    }
+
+    .t-btn.portal-active {
+      border-color: var(--portal-color);
+      color: var(--portal-color);
+      background: rgba(236, 72, 153, 0.12);
+    }
+
+    .t-btn.erase-active {
+      border-color: var(--rule2);
+      color: var(--text-2);
+      background: var(--paper3);
+    }
+
+    .t-sep {
+      width: 1px;
+      height: 22px;
+      background: var(--rule);
+      flex-shrink: 0;
+    }
+
+    /* BIG solve button */
+    .solve-btn {
+      all: unset;
+      cursor: pointer;
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 800;
+      padding: 6px 22px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: var(--hi);
+      color: #fff;
+      border: 1px solid var(--hi);
+      transition: all 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .solve-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateX(-100%);
+      transition: transform 0.3s;
+    }
+
+    .solve-btn:hover::after {
+      transform: translateX(0);
+    }
+
+    .solve-btn:hover {
+      box-shadow: 4px 4px 0 rgba(232, 56, 13, 0.3);
+      transform: translate(-1px, -1px);
+    }
+
+    .solve-btn:active {
+      transform: translate(0, 0);
+      box-shadow: none;
+    }
+
+    .solve-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .solve-btn:disabled::after {
+      display: none;
+    }
+
+    .speed-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      color: var(--text-3);
+    }
+
+    .speed-wrap input[type=range] {
+      width: 60px;
+      accent-color: var(--hi);
+      cursor: pointer;
+    }
+
+    .dls-wrap {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-3);
+    }
+
+    .dls-wrap input[type=number] {
+      width: 44px;
+      background: var(--paper2);
+      border: 1px solid var(--rule);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 6px;
+    }
+
+    /* ── Step Controls ────────────────────────────────────────────── */
+    .step-controls {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .step-controls.visible {
+      display: flex;
+    }
+
+    .step-btn {
+      all: unset;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border: 1px solid var(--rule);
+      color: var(--text-2);
+      background: var(--paper2);
+      transition: all 0.1s;
+    }
+
+    .step-btn:hover {
+      color: var(--text);
+      border-color: var(--hi);
+      background: var(--hi-light);
+    }
+
+    .step-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .step-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-3);
+      min-width: 80px;
+      text-align: center;
+    }
+
+    /* ── Grid ─────────────────────────────────────────────────────── */
+    .grid-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .grid-outer {
+      position: relative;
+      border: 1px solid var(--rule2);
+      overflow: hidden;
+      touch-action: none;
+      box-shadow: var(--s-md);
+      transition: box-shadow 0.3s;
+    }
+
+    .grid-outer.solving {
+      box-shadow: var(--s-lg), 0 0 0 2px var(--hi);
+    }
+
+    #grid {
+      display: grid;
+      gap: 1px;
+      background: var(--cell-gap);
+      user-select: none;
+    }
+
+    .cell {
+      width: var(--cell-size);
+      height: var(--cell-size);
+      background: var(--cell-bg);
+      transition: background 0.04s;
+      position: relative;
+    }
+
+    .cell.wall {
+      background: var(--cell-wall);
+    }
+
+    .cell.sand {
+      background: var(--sand-color);
+    }
+
+    .cell.water {
+      background: var(--water-color);
+    }
+
+    .cell.forest {
+      background: var(--forest-color);
+    }
+
+    .cell.start {
+      background: var(--go) !important;
+    }
+
+    .cell.start::before {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      background: rgba(255, 255, 255, 0.4);
+      clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+    }
+
+    .cell.end {
+      background: var(--stop) !important;
+    }
+
+    .cell.end::before {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      background: rgba(255, 255, 255, 0.4);
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    }
+
+    .cell.waypoint {
+      background: var(--waypoint-color) !important;
+    }
+
+    .cell.waypoint::before {
+      content: attr(data-wp-num);
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 9px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .cell.portal {
+      background: var(--portal-color) !important;
+      animation: portalPulse 2s ease-in-out infinite;
+    }
+
+    .cell.portal::before {
+      content: '⬡';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    @keyframes portalPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .cell.visited {
+      animation: vCell 0.2s ease-out forwards;
+    }
+
+    .cell.path {
+      animation: pCell 0.25s ease-out forwards;
+    }
+
+    .cell.heatmap {
+      transition: background 0.15s;
+    }
+
+    @keyframes vCell {
+      0% {
+        background: var(--hi);
+        transform: scale(0.5);
+      }
+
+      50% {
+        background: rgba(232, 56, 13, 0.5);
+        transform: scale(1.08);
+      }
+
+      100% {
+        background: rgba(232, 56, 13, 0.18);
+        transform: scale(1);
+      }
+    }
+
+    @keyframes pCell {
+      0% {
+        background: var(--path);
+        transform: scale(1.3);
+        box-shadow: 0 0 8px rgba(217, 119, 6, 0.6);
+      }
+
+      100% {
+        background: var(--path);
+        transform: scale(1);
+        box-shadow: none;
+      }
+    }
+
+    /* Scan pulse while solving */
+    .grid-outer::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, transparent 0%, var(--hi) 50%, transparent 100%);
+      opacity: 0;
+      pointer-events: none;
+      background-size: 100% 4px;
+      background-repeat: no-repeat;
+    }
+
+    .grid-outer.solving::after {
+      opacity: 0.25;
+      animation: scanPulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes scanPulse {
+      0% {
+        background-position: 0 -4px;
+      }
+
+      100% {
+        background-position: 0 100%;
+      }
+    }
+
+    /* ── Right Panel ──────────────────────────────────────────────── */
+    .right-panel {
+      width: 210px;
+      min-width: 210px;
+      background: var(--paper2);
+      border-left: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      transition: background 0.3s;
+      scrollbar-width: thin;
+      scrollbar-color: var(--rule) transparent;
+    }
+
+    .rp-block {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .rp-block:last-child {
+      border-bottom: none;
+    }
+
+    .rp-head {
+      font-family: var(--font-display);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      margin-bottom: 8px;
+    }
+
+    .rp-head.clickable {
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    .rp-head.clickable:hover {
+      color: var(--text-2);
+    }
+
+    /* Status */
+    .status-strip {
+      padding: 7px 10px;
+      border: 1px solid var(--rule);
+      background: var(--paper);
+      font-size: 10px;
+      line-height: 1.65;
+      font-weight: 500;
+      color: var(--text-2);
+      border-left: 2px solid var(--rule2);
+      transition: all 0.2s;
+    }
+
+    .status-strip.ok {
+      border-left-color: var(--go);
+      color: var(--go);
+      background: rgba(26, 122, 74, 0.05);
+    }
+
+    .status-strip.fail {
+      border-left-color: var(--stop);
+      color: var(--stop);
+      background: rgba(192, 50, 26, 0.05);
+    }
+
+    /* Stats */
+    .stat-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      background: var(--rule);
+      border: 1px solid var(--rule);
+    }
+
+    .stat-row {
+      background: var(--paper);
+      padding: 7px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 36px;
+    }
+
+    .stat-lbl {
+      font-size: 7.5px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      flex-shrink: 0;
+    }
+
+    .stat-num {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--text);
+      text-align: right;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .stat-num.hi {
+      color: var(--hi);
+    }
+
+    .stat-num.amber {
+      color: var(--path);
+    }
+
+    .stat-num.go {
+      color: var(--go);
+    }
+
+    .stat-num.stop {
+      color: var(--stop);
+    }
+
+    /* Settings */
+    .settings-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .setting-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-2);
+      min-width: 38px;
+    }
+
+    .setting-input {
+      width: 50px;
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 6px;
+    }
+
+    .setting-btn {
+      all: unset;
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border: 1px solid var(--rule);
+      color: var(--text-2);
+      background: var(--paper);
+      transition: all 0.1s;
+    }
+
+    .setting-btn:hover {
+      color: var(--text);
+      border-color: var(--rule2);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-2);
+      cursor: pointer;
+    }
+
+    .toggle-row input[type="checkbox"] {
+      accent-color: var(--hi);
+      cursor: pointer;
+    }
+
+    /* Pseudocode */
+    .pseudocode-wrap {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .pseudocode-wrap.open {
+      max-height: 300px;
+    }
+
+    .pseudocode {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      line-height: 1.7;
+      color: var(--text-2);
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      padding: 8px 10px;
+      overflow-x: auto;
+      white-space: pre;
+      scrollbar-width: thin;
+    }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .leg {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-2);
+    }
+
+    .leg-sw {
+      width: 12px;
+      height: 12px;
+      flex-shrink: 0;
+      border: 1px solid var(--rule);
+    }
+
+    .leg-cost {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 600;
+      color: var(--text-3);
+    }
+
+    /* Presets */
+    .preset-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .preset-btn {
+      all: unset;
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border: 1px solid var(--rule);
+      color: var(--text-2);
+      background: var(--paper);
+      transition: all 0.1s;
+      letter-spacing: 0.2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .preset-btn::before {
+      content: '→';
+      color: var(--text-3);
+      font-size: 11px;
+      transition: color 0.1s, transform 0.1s;
+      display: inline-block;
+    }
+
+    .preset-btn:hover {
+      color: var(--text);
+      background: var(--paper3);
+      border-color: var(--rule2);
+    }
+
+    .preset-btn:hover::before {
+      color: var(--hi);
+      transform: translateX(2px);
+    }
+
+    /* Actions */
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+
+    .action-btn {
+      all: unset;
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-size: 9px;
+      font-weight: 700;
+      padding: 7px 6px;
+      border: 1px solid var(--rule);
+      color: var(--text-2);
+      background: var(--paper);
+      transition: all 0.1s;
+      text-align: center;
+      letter-spacing: 0.2px;
+    }
+
+    .action-btn:hover {
+      color: var(--text);
+      border-color: var(--rule2);
+      background: var(--paper3);
+    }
+
+    .action-btn.primary {
+      background: var(--hi);
+      color: #fff;
+      border-color: var(--hi);
+      grid-column: span 2;
+    }
+
+    .action-btn.primary:hover {
+      opacity: 0.9;
+    }
+
+    /* ── Modal ────────────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      box-shadow: var(--s-lg);
+      max-width: 650px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--rule);
+      background: var(--paper2);
+    }
+
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .modal-close {
+      all: unset;
+      cursor: pointer;
+      font-size: 20px;
+      color: var(--text-3);
+      padding: 4px 8px;
+      transition: color 0.15s;
+    }
+
+    .modal-close:hover {
+      color: var(--text);
+    }
+
+    .modal-body {
+      padding: 16px 20px;
+    }
+
+    /* Benchmark table */
+    .bench-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .bench-table th {
+      font-family: var(--font-display);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 2px solid var(--rule);
+    }
+
+    .bench-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--rule);
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    .bench-table tr:hover td {
+      background: var(--paper2);
+    }
+
+    .bench-table .best {
+      color: var(--go);
+      font-weight: 800;
+    }
+
+    .bench-table .algo-name {
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .bench-table .not-found {
+      color: var(--stop);
+    }
+
+    .bench-bar {
+      height: 4px;
+      background: var(--hi);
+      margin-top: 3px;
+      transition: width 0.3s;
+    }
+
+    /* Challenge cards */
+    .challenge-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .challenge-card {
+      border: 1px solid var(--rule);
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: var(--paper2);
+    }
+
+    .challenge-card:hover {
+      border-color: var(--hi);
+      background: var(--hi-light);
+    }
+
+    .challenge-name {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .challenge-desc {
+      font-size: 11px;
+      color: var(--text-2);
+      line-height: 1.5;
+    }
+
+    .challenge-hint {
+      margin-top: 8px;
+      font-size: 10px;
+      color: var(--text-3);
+      font-style: italic;
+    }
+
+    /* ── Tutorial ─────────────────────────────────────────────────── */
+    .tutorial-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(2px);
+    }
+
+    .tutorial-overlay.open {
+      display: flex;
+    }
+
+    .tutorial-card {
+      background: var(--paper);
+      border: 2px solid var(--hi);
+      box-shadow: var(--s-lg);
+      padding: 24px 28px;
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .tutorial-step-num {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-3);
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .tutorial-title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .tutorial-text {
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text-2);
+      margin-bottom: 20px;
+    }
+
+    .tutorial-nav {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .tutorial-btn {
+      all: unset;
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 8px 24px;
+      border: 1px solid var(--rule);
+      color: var(--text-2);
+      transition: all 0.15s;
+    }
+
+    .tutorial-btn:hover {
+      color: var(--text);
+      border-color: var(--rule2);
+    }
+
+    .tutorial-btn.primary {
+      background: var(--hi);
+      color: #fff;
+      border-color: var(--hi);
+    }
+
+    .tutorial-btn.primary:hover {
+      opacity: 0.9;
+    }
+
+    /* ── Mobile stats ─────────────────────────────────────────────── */
+    .m-stats {
+      display: none;
+      width: 100%;
+      flex-shrink: 0;
+      border: 1px solid var(--rule);
+      background: var(--rule);
+      gap: 1px;
+    }
+
+    .m-stat {
+      flex: 1;
+      background: var(--paper2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 5px 4px;
+    }
+
+    .m-stat-l {
+      font-size: 7px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+
+    .m-stat-v {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    .m-stat-v.hi { color: var(--hi); }
+    .m-stat-v.amber { color: var(--path); }
+    .m-stat-v.go { color: var(--go); }
+    .m-stat-v.stop { color: var(--stop); }
+
+    /* ── Efficiency badge ─────────────────────────────────────────── */
+    .efficiency-badge {
+      display: none;
+      padding: 6px 10px;
+      border: 1px solid var(--rule);
+      background: var(--paper);
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    .efficiency-badge.visible {
+      display: block;
+    }
+
+    .eff-label {
+      font-size: 7.5px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+
+    .eff-value {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 800;
+      margin-top: 2px;
+    }
+
+    .eff-grade {
+      font-size: 9px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    /* ── RESPONSIVE ───────────────────────────────────────────────── */
+    @media (max-width: 960px) {
+      .right-panel {
+        display: none;
+      }
+
+      :root {
+        --cell-size: 17px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      :root {
+        --cell-size: 14px;
+      }
+
+      body {
+        overflow: hidden;
+      }
+
+      .menu-hdr-btn {
+        display: flex;
+      }
+
+      .header-algo-pill {
+        display: none;
+      }
+
+      .left-panel {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 260px;
+        min-width: 0;
+        transform: translateX(-100%);
+        box-shadow: var(--s-lg);
+      }
+
+      .left-panel.open {
+        transform: translateX(0);
+      }
+
+      .backdrop.open {
+        display: block;
+      }
+
+      .algo-strip {
+        display: flex;
+      }
+
+      .center {
+        padding: 6px;
+        gap: 4px;
+      }
+
+      .m-stats {
+        display: flex;
+      }
+    }
+
+    @media (max-width: 380px) {
+      :root {
+        --cell-size: 12px;
+      }
+    }
+  
+    /* Sorting Specific CSS */
+    .bar {
+        background: var(--hi);
+        width: 100%;
+        border-radius: 2px 2px 0 0;
+        transition: height 0.05s linear;
+    }
+    .bar.compare {
+        background: var(--path);
+    }
+    .bar.sorted {
+        background: var(--go);
+    }
+    
+    .c-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: var(--paper);
+        border: 1px solid var(--rule);
+        padding: 5px;
+        flex: 1 1 30%;
+        min-width: 250px;
+        height: 250px;
+    }
+    .c-title {
+        font-family: var(--font-display);
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+    .c-bars {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        align-items: flex-end;
+        gap: 1px;
+    }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid var(--rule); padding: 5px; }
+    .r-crown { color: var(--path); font-size: 14px; }
+  </style>
+</head>
+
+
+
+<body>
+  <!-- ── Header ─────────────────────────────────────────────────── -->
+  <header>
+    <div class="logo-block">
+      <span class="logo-text">PathMind</span>
+      <div class="logo-dot"></div>
+    </div>
+    
+    <a href="/" class="hdr-btn" style="text-decoration: none; border-left: none; border-right: 1px solid color-mix(in srgb, var(--hdr-fg) 10%, transparent);">Pathfinding</a>
+    <a href="/sorting" class="hdr-btn" style="text-decoration: none; border-left: none; border-right: 1px solid color-mix(in srgb, var(--hdr-fg) 10%, transparent); background: color-mix(in srgb, var(--hdr-fg) 6%, transparent); color: var(--hdr-fg);">Sorting</a>
+
+    <div class="header-algo-pill">
+      <span class="algo-running-label">Algorithm</span>
+      <span class="algo-running-name" id="hdr-algo-name">Merge Sort</span>
+    </div>
+
+    <div class="header-right">
+      <button class="hdr-btn" onclick="toggleTheme()"><span class="theme-icon" id="theme-icon">🌙</span><span id="theme-label">Dark</span></button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- ── Left Panel ──────────────────────────────────────────── -->
+    <div class="left-panel" id="left-panel">
+      <div class="panel-head">
+        <span class="panel-head-label">Sorting Algorithm</span>
+      </div>
+      <div class="algo-list">
+        <button class="algo-btn active" id="btn-merge" onclick="sel('merge')"><div class="a-dot" style="background:#059669"></div>Merge Sort<span class="a-abbr">MS</span></button>
+        <button class="algo-btn" id="btn-quick" onclick="sel('quick')"><div class="a-dot" style="background:#db2777"></div>Quick Sort<span class="a-abbr">QS</span></button>
+        <button class="algo-btn" id="btn-heap" onclick="sel('heap')"><div class="a-dot" style="background:#d97706"></div>Heap Sort<span class="a-abbr">HS</span></button>
+        <button class="algo-btn" id="btn-insertion" onclick="sel('insertion')"><div class="a-dot" style="background:#0891b2"></div>Insertion Sort<span class="a-abbr">IS</span></button>
+        <button class="algo-btn" id="btn-selection" onclick="sel('selection')"><div class="a-dot" style="background:#7c3aed"></div>Selection Sort<span class="a-abbr">SS</span></button>
+        <button class="algo-btn" id="btn-bubble" onclick="sel('bubble')"><div class="a-dot" style="background:#e8380d"></div>Bubble Sort<span class="a-abbr">BS</span></button>
+      </div>
+      <div class="panel-head" style="border-top: 1px solid var(--rule);">
+        <span class="panel-head-label">Compare Mode</span>
+      </div>
+      <div class="algo-list">
+        <button class="algo-btn" id="btn-compare-mode" onclick="toggleCompareMode()"><div class="a-dot" style="background:var(--text)"></div>Start Compare Mode</button>
+      </div>
+      <div class="info-panel">
+        <div class="info-inner" id="info-card"></div>
+      </div>
+    </div>
+
+    <!-- ── Center ──────────────────────────────────────────────── -->
+    <div class="center">
+      <!-- Toolbar -->
+      <div class="toolbar" id="main-toolbar">
+         <button class="solve-btn" id="solve-btn" onclick="runSorting()">▶ Sort</button>
+         <button class="t-btn" id="gen-btn" onclick="genArray()">↻ New Array</button>
+         <div class="t-sep"></div>
+         <div class="speed-wrap">
+           <span>Size</span>
+           <input type="range" id="arr-size" min="10" max="250" value="80" oninput="genArray()">
+         </div>
+         <div class="t-sep"></div>
+         <div class="speed-wrap">
+           <span>Speed</span>
+           <input type="range" id="arr-speed" min="1" max="100" value="80">
+         </div>
+      </div>
+
+      <!-- Compare Toolbar -->
+      <div class="toolbar" id="compare-toolbar" style="display:none;">
+         <button class="solve-btn" onclick="runCompare()">▶ Race All</button>
+         <button class="t-btn" onclick="genArray()">↻ Random</button>
+         <button class="t-btn" onclick="closeCompareMode()">⊘ Exit Compare</button>
+         <div class="t-sep"></div>
+         <span style="font-size:10px;font-weight:700;color:var(--text-3);">Algos:</span>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-merge" checked> Merge</label>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-quick" checked> Quick</label>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-heap" checked> Heap</label>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-insertion"> Insert</label>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-selection"> Select</label>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-bubble"> Bubble</label>
+         <div class="t-sep"></div>
+         <input type="text" id="custom-array" placeholder="Custom Array e.g. 5,2,9,1" class="setting-input" style="width:140px;">
+      </div>
+
+      <div id="status-strip" class="status-strip" style="width:100%; border-left:none; border-right:none; text-align:center;">Select an algorithm and click Sort.</div>
+
+      <div class="grid-wrap" style="flex-direction:column; padding: 20px;">
+        <div id="visual-container" style="display:flex; width:100%; height:100%; align-items:flex-end; justify-content:center; gap: 2px;">
+        </div>
+        <div id="compare-container" style="display:none; width:100%; height:100%; flex-wrap:wrap; gap: 10px; overflow-y:auto; justify-content:center;">
+        </div>
+      </div>
+
+      <!-- Compare Results -->
+      <div id="compare-results" style="display:none; margin-bottom:20px; padding:15px; background:var(--paper2); border:1px solid var(--rule); width:80%;">
+        <table id="results-table">
+          <thead><tr><th>Rank</th><th>Algorithm</th><th>Time (ms)</th></tr></thead>
+          <tbody id="results-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let dark = localStorage.getItem('theme') !== 'light';
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.setAttribute('data-theme', 'light');
+
+    function toggleTheme() {
+      dark = !dark;
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      localStorage.setItem('theme', dark ? 'dark' : 'light');
+      document.getElementById('theme-icon').textContent = dark ? '🌙' : '☀️';
+      document.getElementById('theme-label').textContent = dark ? 'Dark' : 'Light';
+    }
+    document.getElementById('theme-icon').textContent = dark ? '🌙' : '☀️';
+    document.getElementById('theme-label').textContent = dark ? 'Dark' : 'Light';
+
+    // ── DATA ────────────────────────────────────────────────────────
+    const INFO = {
+      merge: {
+        name: 'Merge Sort',
+        desc: 'A divide and conquer algorithm that divides the array into halves, sorts them, and then merges them back together.',
+        recurrence: 'T(n) = 2T(n/2) + O(n)',
+        time: { best: 'O(n log n)', avg: 'O(n log n)', worst: 'O(n log n)' },
+        timeExp: 'Always divides exactly in half, hence the stable log n depth and linear merge.',
+        space: 'O(n)',
+        spaceExp: 'Requires auxiliary space during the merge phase.',
+        uses: [
+          ['External Sorting', 'Highly efficient for datasets too large to fit in memory (using tape/disk).'],
+          ['Linked Lists', 'Can be implemented on linked lists with O(1) extra space.']
+        ]
+      },
+      quick: {
+        name: 'Quick Sort',
+        desc: 'A highly efficient, in-place, divide and conquer algorithm. It picks a pivot and partitions the array around it.',
+        recurrence: 'T(n) = T(k) + T(n-k-1) + O(n)',
+        time: { best: 'O(n log n)', avg: 'O(n log n)', worst: 'O(n²)' },
+        timeExp: 'Worst case occurs when array is already sorted and worst pivot is constantly chosen.',
+        space: 'O(log n)',
+        spaceExp: 'In-place sorting, but recursive call stack takes O(log n) space.',
+        uses: [
+          ['Commercial Computing', 'Often used in built-in sort functions (like C++ std::sort) because it caches extremely well.'],
+          ['In-Memory Sorting', 'When memory is tight, quick sort is preferred over merge sort.']
+        ]
+      },
+      heap: {
+        name: 'Heap Sort',
+        desc: 'Similar to selection sort but uses a max-heap data structure to efficiently find the maximum element.',
+        recurrence: 'N/A',
+        time: { best: 'O(n log n)', avg: 'O(n log n)', worst: 'O(n log n)' },
+        timeExp: 'Building the heap is O(n), and extracting maximum n times is O(n log n).',
+        space: 'O(1)',
+        spaceExp: 'Entirely in-place manipulation of the array.',
+        uses: [
+          ['Embedded Systems', 'Favored in systems with strict memory bounds (Linux kernel usage).'],
+          ['Priority Queues', 'The heap structure itself perfectly implements priority queues.']
+        ]
+      },
+      insertion: {
+        name: 'Insertion Sort',
+        desc: 'Builds the final sorted array one item at a time by shifting elements to the right to make room.',
+        recurrence: 'N/A',
+        time: { best: 'O(n)', avg: 'O(n²)', worst: 'O(n²)' },
+        timeExp: 'Best case occurs when array is nearly or completely sorted (only a single check per element).',
+        space: 'O(1)',
+        spaceExp: 'Sorts entirely in place.',
+        uses: [
+          ['Nearly Sorted Data', 'Extremely fast and adaptive on arrays that are already mostly sorted.'],
+          ['Small Datasets', 'Often used iteratively for the smallest partitions inside quicksort (hybrid sorting e.g. Timsort).']
+        ]
+      },
+      selection: {
+        name: 'Selection Sort',
+        desc: 'Iteratively finds the minimum element in the unsorted portion and swaps it into the correct position.',
+        recurrence: 'N/A',
+        time: { best: 'O(n²)', avg: 'O(n²)', worst: 'O(n²)' },
+        timeExp: 'Must always blindly scan the entire unsorted portion to confirm the minimum element.',
+        space: 'O(1)',
+        spaceExp: 'Sorts entirely in place.',
+        uses: [
+          ['Flash Memory', 'Minimizes the absolute number of swaps (writes) made, extending memory lifespan.']
+        ]
+      },
+      bubble: {
+        name: 'Bubble Sort',
+        desc: 'Repeatedly steps through the list, compares adjacent elements and swaps them if they are in the wrong order.',
+        recurrence: 'N/A',
+        time: { best: 'O(n)', avg: 'O(n²)', worst: 'O(n²)' },
+        timeExp: 'If optimized, it runs in O(n) when the array is already sorted by breaking early without swaps.',
+        space: 'O(1)',
+        spaceExp: 'Sorts entirely in place.',
+        uses: [
+          ['Educational', 'Primarily utilized to introduce the concept of sorting algorithms to students.'],
+          ['Computer Graphics', 'Detecting small errors in mostly-sorted polygon depth lists.']
+        ]
+      }
+    };
+
+    let activeAlgo = 'merge';
+    let array = [];
+    let isCompareMode = false;
+    let playing = false;
+    let frames = [];
+    
+    function setStatus(msg) { document.getElementById('status-strip').textContent = msg; }
+    function sl(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    function renderInfo() {
+      const i = INFO[activeAlgo];
+      document.getElementById('hdr-algo-name').textContent = i.name;
+      
+      let html = `<div class="algo-title-display">${i.name}</div>
+        <div class="algo-desc">${i.desc}</div>
+        <div class="prop-row"><div class="prop-pill" style="border-color:var(--text-3);color:var(--text-2);background:var(--paper3);">${i.recurrence}</div></div>
+        
+        <div class="complexity-row">
+            <div class="cx-card"><div class="cx-label">Time (Avg)</div><div class="cx-val">${i.time.avg}</div></div>
+            <div class="cx-card"><div class="cx-label">Space</div><div class="cx-val">${i.space}</div></div>
+        </div>
+        
+        <div style="font-size:10px; color:var(--text-2); margin-top:5px;"><b>Why?</b> ${i.timeExp} ${i.spaceExp}</div>
+        
+        <div style="margin-top:10px; border-top:1px solid var(--rule); padding-top:10px;">
+           <div class="cx-label">Use Cases</div>`;
+           
+      i.uses.forEach(u => {
+          html += `<div style="margin-bottom:6px;"><div style="font-size:10px;font-weight:700;color:var(--text);">${u[0]}</div><div style="font-size:9px;color:var(--text-2);">${u[1]}</div></div>`;
+      });
+      html += `</div>`;
+      
+      document.getElementById('info-card').innerHTML = html;
+    }
+
+    function sel(a) {
+      if(playing) return;
+      document.querySelectorAll('.algo-btn').forEach(e => e.classList.remove('active'));
+      document.getElementById('btn-' + a).classList.add('active');
+      activeAlgo = a;
+      renderInfo();
+      genArray();
+    }
+
+    function toggleCompareMode() {
+      if(playing) return;
+      isCompareMode = true;
+      document.getElementById('main-toolbar').style.display = 'none';
+      document.getElementById('compare-toolbar').style.display = 'flex';
+      document.getElementById('visual-container').style.display = 'none';
+      document.getElementById('compare-container').style.display = 'flex';
+      document.getElementById('compare-results').style.display = 'none';
+      
+      document.querySelectorAll('.algo-btn').forEach(e => e.classList.remove('active'));
+      document.getElementById('btn-compare-mode').classList.add('active');
+      renderCompareContainers();
+      setStatus("Select algorithms and click Race All.");
+    }
+
+    function closeCompareMode() {
+      if(playing) return;
+      isCompareMode = false;
+      document.getElementById('main-toolbar').style.display = 'flex';
+      document.getElementById('compare-toolbar').style.display = 'none';
+      document.getElementById('visual-container').style.display = 'flex';
+      document.getElementById('compare-container').style.display = 'none';
+      document.getElementById('compare-results').style.display = 'none';
+      sel('merge');
+    }
+
+    function genArray() {
+      if(playing) return;
+      const size = parseInt(document.getElementById('arr-size').value);
+      array = [];
+      const min = 5, max = 100;
+      for(let i=0; i<size; i++) {
+          array.push(Math.floor(Math.random()*(max-min+1))+min);
+      }
+      
+      if(!isCompareMode) renderArray();
+      else renderCompareContainers();
+    }
+
+    function renderArray() {
+      const container = document.getElementById('visual-container');
+      container.innerHTML = '';
+      const maxVal = Math.max(...array);
+      array.forEach((val, idx) => {
+          const bar = document.createElement('div');
+          bar.className = 'bar';
+          bar.id = 'b-' + idx;
+          bar.style.height = ((val / maxVal) * 100) + '%';
+          container.appendChild(bar);
+      });
+      setStatus("Array initialized. Click Sort to begin.");
+    }
+
+    function getCompareAlgos() {
+        const selected = [];
+        ['merge','quick','heap','insertion','selection','bubble'].forEach(a => {
+            if(document.getElementById('c-'+a).checked) selected.push(a);
+        });
+        return selected;
+    }
+
+    function renderCompareContainers() {
+        let arr = [...array];
+        const cust = document.getElementById('custom-array').value;
+        if (cust) {
+            arr = cust.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x));
+            if(arr.length === 0) arr = [...array];
+        } else {
+            document.getElementById('custom-array').value = array.join(',');
+        }
+        
+        const algos = getCompareAlgos();
+        const sc = document.getElementById('compare-container');
+        sc.innerHTML = '';
+        algos.forEach(a => {
+            const wrap = document.createElement('div');
+            wrap.className = 'c-wrap';
+            wrap.innerHTML = `<div class="c-title">${INFO[a].name}</div><div class="c-bars" id="cb-${a}"></div>`;
+            sc.appendChild(wrap);
+            
+            const bcont = wrap.querySelector('.c-bars');
+            const maxVal = Math.max(...arr) || 1;
+            arr.forEach((val, idx) => {
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                bar.id = `cb-${a}-${idx}`;
+                bar.style.height = ((val / maxVal) * 100) + '%';
+                bcont.appendChild(bar);
+            });
+        });
+        document.getElementById('compare-results').style.display = 'none';
+    }
+
+    async function runSorting() {
+        if(playing) return;
+        playing = true;
+        document.getElementById('solve-btn').textContent = "Sorting...";
+        document.getElementById('solve-btn').classList.add('active');
+        setStatus("Fetching algorithm execution from Python...");
+        
+        try {
+            const res = await fetch('/api/sort', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ array, algorithm: activeAlgo })
+            });
+            const data = await res.json();
+            
+            setStatus(`Sorting animated... (Python executed in ${data.timeMs}ms)`);
+            const frames = data.frames;
+            
+            let delay = 101 - document.getElementById('arr-speed').value;
+            if(delay < 5) delay = delay / 2;
+
+            for(let f of frames) {
+                if(f.t === 'compare') {
+                    if (document.getElementById('b-'+f.i)) document.getElementById('b-'+f.i).style.background = 'var(--path)';
+                    if (document.getElementById('b-'+f.j)) document.getElementById('b-'+f.j).style.background = 'var(--path)';
+                    if (delay > 2) await sl(delay);
+                    if (document.getElementById('b-'+f.i)) document.getElementById('b-'+f.i).style.background = '';
+                    if (document.getElementById('b-'+f.j)) document.getElementById('b-'+f.j).style.background = '';
+                } else if(f.t === 'swap') {
+                    const bi = document.getElementById('b-'+f.i);
+                    const bj = document.getElementById('b-'+f.j);
+                    if(bi && bj) {
+                        const h = bi.style.height;
+                        bi.style.height = bj.style.height;
+                        bj.style.height = h;
+                        bi.style.background = 'var(--stop)';
+                        bj.style.background = 'var(--stop)';
+                        if (delay > 2) await sl(delay);
+                        bi.style.background = '';
+                        bj.style.background = '';
+                    }
+                } else if(f.t === 'set') {
+                    const bi = document.getElementById('b-'+f.i);
+                    if(bi) {
+                        bi.style.height = ((f.v / Math.max(...array)) * 100) + '%';
+                        bi.style.background = 'var(--go)';
+                        if (delay > 2) await sl(delay);
+                        bi.style.background = '';
+                    }
+                }
+            }
+            
+            // Validation sweep
+            for(let i=0; i<array.length; i++) {
+                if(document.getElementById('b-'+i)) {
+                    document.getElementById('b-'+i).classList.add('sorted');
+                    if (delay > 10) await sl(10);
+                }
+            }
+            setStatus(`Sort Complete! Python time: ${data.timeMs}ms`);
+            
+        } catch(e) {
+            setStatus("Error executing algorithm in backend.");
+        }
+        
+        playing = false;
+        document.getElementById('solve-btn').textContent = "▶ Sort";
+        document.getElementById('solve-btn').classList.remove('active');
+    }
+
+    async function runCompare() {
+        if(playing) return;
+        const algos = getCompareAlgos();
+        if(algos.length < 2) { setStatus("Select at least 2 algorithms."); return; }
+        playing = true;
+        
+        let arr = [...array];
+        const cust = document.getElementById('custom-array').value;
+        if(cust) arr = cust.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x));
+
+        setStatus("Racing " + algos.length + " algorithms on backend...");
+        
+        let results = [];
+        const tbd = document.getElementById('results-tbody');
+        tbd.innerHTML = `<tr><td colspan="3" style="text-align:center;">Executing...</td></tr>`;
+        document.getElementById('compare-results').style.display = 'block';
+
+        // Animate them together
+        const maxVal = Math.max(...arr) || 1;
+
+        // Fetch all independently
+        const promises = algos.map(async a => {
+            const res = await fetch('/api/sort', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ array: arr, algorithm: a })
+            });
+            const data = await res.json();
+            return { algo: a, time: data.timeMs, frames: data.frames };
+        });
+
+        const responses = await Promise.all(promises);
+        responses.sort((a,b) => a.time - b.time);
+        
+        // Show actual results
+        tbd.innerHTML = '';
+        responses.forEach((r, idx) => {
+            tbd.innerHTML += `<tr>
+                <td>${idx+1} ${idx===0 ? '<span class="r-crown">👑</span>' : ''}</td>
+                <td><strong style="color:var(--text)">${INFO[r.algo].name}</strong></td>
+                <td>${r.time} ms</td>
+            </tr>`;
+        });
+        
+        setStatus("Race complete! Backend execution times processed. Animating frames (simultaneous execution)...");
+
+        // Concurrent animation loops
+        const animPromises = responses.map(async r => {
+            let delay = 10;
+            for(let f of r.frames) {
+                if(f.t === 'swap') {
+                    const bi = document.getElementById(`cb-${r.algo}-${f.i}`);
+                    const bj = document.getElementById(`cb-${r.algo}-${f.j}`);
+                    if(bi && bj) {
+                        const h = bi.style.height; bi.style.height = bj.style.height; bj.style.height = h;
+                    }
+                } else if(f.t === 'set') {
+                    const bi = document.getElementById(`cb-${r.algo}-${f.i}`);
+                    if(bi) bi.style.height = ((f.v / maxVal) * 100) + '%';
+                }
+                if(delay) await sl(delay);
+            }
+            // Sweep
+            for(let i=0; i<arr.length; i++) {
+                const bi = document.getElementById(`cb-${r.algo}-${i}`);
+                if(bi) bi.style.background = 'var(--go)';
+                await sl(5);
+            }
+        });
+        
+        await Promise.all(animPromises);
+        setStatus("Animation complete!");
+        
+        playing = false;
+    }
+
+    // Init
+    sel('merge');
+  </script>
+</body>
+</html>

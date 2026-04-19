@@ -308,5 +308,166 @@ def benchmark():
     return jsonify(results)
 
 
+# ── Sorting Algorithms ─────────────────────────────────────────────────────────
+
+def bubble_sort(arr):
+    frames = []
+    n = len(arr)
+    for i in range(n):
+        for j in range(0, n - i - 1):
+            frames.append({'t': 'compare', 'i': j, 'j': j+1})
+            if arr[j] > arr[j+1]:
+                frames.append({'t': 'swap', 'i': j, 'j': j+1})
+                arr[j], arr[j+1] = arr[j+1], arr[j]
+    return frames
+
+def selection_sort(arr):
+    frames = []
+    n = len(arr)
+    for i in range(n):
+        min_idx = i
+        for j in range(i+1, n):
+            frames.append({'t': 'compare', 'i': min_idx, 'j': j})
+            if arr[j] < arr[min_idx]:
+                min_idx = j
+        if min_idx != i:
+            frames.append({'t': 'swap', 'i': i, 'j': min_idx})
+            arr[i], arr[min_idx] = arr[min_idx], arr[i]
+    return frames
+
+def insertion_sort(arr):
+    frames = []
+    n = len(arr)
+    for i in range(1, n):
+        key = arr[i]
+        j = i - 1
+        while j >= 0:
+            frames.append({'t': 'compare', 'i': j, 'j': j+1})
+            if arr[j] > key:
+                frames.append({'t': 'set', 'i': j+1, 'v': arr[j]})
+                arr[j+1] = arr[j]
+                j -= 1
+            else:
+                break
+        frames.append({'t': 'set', 'i': j+1, 'v': key})
+        arr[j+1] = key
+    return frames
+
+def merge_sort(arr):
+    frames = []
+    def merge(s, m, e):
+        L = arr[s:m+1]
+        R = arr[m+1:e+1]
+        i = j = 0
+        k = s
+        while i < len(L) and j < len(R):
+            # approximate comparisons
+            frames.append({'t': 'compare', 'i': s+i, 'j': m+1+j})
+            if L[i] <= R[j]:
+                frames.append({'t': 'set', 'i': k, 'v': L[i]})
+                arr[k] = L[i]
+                i += 1
+            else:
+                frames.append({'t': 'set', 'i': k, 'v': R[j]})
+                arr[k] = R[j]
+                j += 1
+            k += 1
+        while i < len(L):
+            frames.append({'t': 'set', 'i': k, 'v': L[i]})
+            arr[k] = L[i]
+            i += 1
+            k += 1
+        while j < len(R):
+            frames.append({'t': 'set', 'i': k, 'v': R[j]})
+            arr[k] = R[j]
+            j += 1
+            k += 1
+    def ms(s, e):
+        if s < e:
+            m = (s + e) // 2
+            ms(s, m)
+            ms(m+1, e)
+            merge(s, m, e)
+    ms(0, len(arr)-1)
+    return frames
+
+def quick_sort(arr):
+    frames = []
+    def partition(low, high):
+        pivot = arr[high]
+        i = low - 1
+        for j in range(low, high):
+            frames.append({'t': 'compare', 'i': j, 'j': high})
+            if arr[j] < pivot:
+                i += 1
+                frames.append({'t': 'swap', 'i': i, 'j': j})
+                arr[i], arr[j] = arr[j], arr[i]
+        frames.append({'t': 'swap', 'i': i+1, 'j': high})
+        arr[i+1], arr[high] = arr[high], arr[i+1]
+        return i + 1
+    def qs(low, high):
+        if low < high:
+            pi = partition(low, high)
+            qs(low, pi - 1)
+            qs(pi + 1, high)
+    qs(0, len(arr)-1)
+    return frames
+
+def heap_sort(arr):
+    frames = []
+    n = len(arr)
+    def heapify(nn, i):
+        largest = i
+        l = 2 * i + 1
+        r = 2 * i + 2
+        if l < nn:
+            frames.append({'t': 'compare', 'i': l, 'j': largest})
+            if arr[l] > arr[largest]:
+                largest = l
+        if r < nn:
+            frames.append({'t': 'compare', 'i': r, 'j': largest})
+            if arr[r] > arr[largest]:
+                largest = r
+        if largest != i:
+            frames.append({'t': 'swap', 'i': i, 'j': largest})
+            arr[i], arr[largest] = arr[largest], arr[i]
+            heapify(nn, largest)
+    for i in range(n // 2 - 1, -1, -1):
+        heapify(n, i)
+    for i in range(n - 1, 0, -1):
+        frames.append({'t': 'swap', 'i': i, 'j': 0})
+        arr[i], arr[0] = arr[0], arr[i]
+        heapify(i, 0)
+    return frames
+
+SORT_ALGOS = {
+    'bubble': bubble_sort,
+    'selection': selection_sort,
+    'insertion': insertion_sort,
+    'merge': merge_sort,
+    'quick': quick_sort,
+    'heap': heap_sort,
+}
+
+@app.route('/sorting')
+def sorting():
+    return render_template('sorting.html')
+
+@app.route('/api/sort', methods=['POST'])
+def api_sort():
+    data = request.json
+    arr = list(data['array'])
+    algo = data['algorithm']
+    if algo not in SORT_ALGOS:
+        return jsonify({'error': 'Unknown algorithm'}), 400
+        
+    t0 = time.perf_counter()
+    frames = SORT_ALGOS[algo](arr)
+    t1 = time.perf_counter()
+    return jsonify({
+        'frames': frames,
+        'timeMs': round((t1 - t0) * 1000, 3)
+    })
+
 if __name__ == '__main__':
     app.run(debug=False, port=5000)

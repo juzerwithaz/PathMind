@@ -1763,6 +1763,8 @@
            <span>Speed</span>
            <input type="range" id="arr-speed" min="1" max="100" value="80">
          </div>
+         <div class="t-sep"></div>
+         <input type="text" id="custom-array-normal" placeholder="Custom Array e.g. 5,2,9,1" class="setting-input" style="width:140px;" oninput="if(!playing) applyCustomNormal()">
       </div>
 
       <!-- Compare Toolbar -->
@@ -1952,7 +1954,7 @@
       
       document.querySelectorAll('.algo-btn').forEach(e => e.classList.remove('active'));
       document.getElementById('btn-compare-mode').classList.add('active');
-      renderCompareContainers();
+      genArray();
       setStatus("Select algorithms and click Race All.");
     }
 
@@ -1969,23 +1971,36 @@
 
     function genArray() {
       if(playing) return;
-      const size = parseInt(document.getElementById('arr-size').value);
+      let size = parseInt(document.getElementById('arr-size').value) || 50;
+      if(isCompareMode) size = Math.floor(Math.random() * 5) + 6;
       array = [];
       const min = 5, max = 100;
       for(let i=0; i<size; i++) {
           array.push(Math.floor(Math.random()*(max-min+1))+min);
       }
       const ca = document.getElementById('custom-array');
-      if(ca) ca.value = '';
+      if(ca) ca.value = isCompareMode ? array.join(', ') : '';
+      const cn = document.getElementById('custom-array-normal');
+      if(cn) cn.value = '';
       
       if(!isCompareMode) renderArray();
       else renderCompareContainers();
     }
 
+    function applyCustomNormal() {
+        const val = document.getElementById('custom-array-normal').value;
+        if(val !== "") {
+            array = val.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x));
+        } else {
+            array = [];
+        }
+        renderArray();
+    }
+
     function renderArray() {
       const container = document.getElementById('visual-container');
       container.innerHTML = '';
-      const maxVal = Math.max(...array);
+      const maxVal = Math.max(...array, 1);
       array.forEach((val, idx) => {
           const bar = document.createElement('div');
           bar.className = 'bar';
@@ -2005,14 +2020,8 @@
     }
 
     function renderCompareContainers() {
-        let arr = [...array];
-        const cust = document.getElementById('custom-array').value;
-        if (cust) {
-            arr = cust.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x));
-            if(arr.length === 0) arr = [...array];
-        } else {
-            document.getElementById('custom-array').value = array.join(',');
-        }
+        const custVal = document.getElementById('custom-array').value;
+        const arr = custVal ? custVal.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x)) : [];
         
         const algos = getCompareAlgos();
         const sc = document.getElementById('compare-container');
@@ -2024,7 +2033,7 @@
             sc.appendChild(wrap);
             
             const bcont = wrap.querySelector('.c-bars');
-            const maxVal = Math.max(...arr) || 1;
+            const maxVal = Math.max(...arr, 1);
             arr.forEach((val, idx) => {
                 const bar = document.createElement('div');
                 bar.className = 'bar';
@@ -2109,11 +2118,12 @@
         if(playing) return;
         const algos = getCompareAlgos();
         if(algos.length < 2) { setStatus("Select at least 2 algorithms."); return; }
-        playing = true;
         
-        let arr = [...array];
-        const cust = document.getElementById('custom-array').value;
-        if(cust) arr = cust.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x));
+        const custVal = document.getElementById('custom-array').value;
+        const arr = custVal ? custVal.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x)) : [];
+        if(arr.length === 0) { setStatus("Array is empty."); return; }
+
+        playing = true;
 
         setStatus("Racing " + algos.length + " algorithms on backend...");
         

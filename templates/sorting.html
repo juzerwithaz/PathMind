@@ -1772,14 +1772,14 @@
          <button class="t-btn" onclick="closeCompareMode()">⊘ Exit Compare</button>
          <div class="t-sep"></div>
          <span style="font-size:10px;font-weight:700;color:var(--text-3);">Algos:</span>
-         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-merge" checked> Merge</label>
-         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-quick" checked> Quick</label>
-         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-heap" checked> Heap</label>
-         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-insertion"> Insert</label>
-         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-selection"> Select</label>
-         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-bubble"> Bubble</label>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-merge" checked onchange="if(!playing) renderCompareContainers()"> Merge</label>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-quick" checked onchange="if(!playing) renderCompareContainers()"> Quick</label>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-heap" checked onchange="if(!playing) renderCompareContainers()"> Heap</label>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-insertion" onchange="if(!playing) renderCompareContainers()"> Insert</label>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-selection" onchange="if(!playing) renderCompareContainers()"> Select</label>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-bubble" onchange="if(!playing) renderCompareContainers()"> Bubble</label>
          <div class="t-sep"></div>
-         <input type="text" id="custom-array" placeholder="Custom Array e.g. 5,2,9,1" class="setting-input" style="width:140px;">
+         <input type="text" id="custom-array" placeholder="Custom Array e.g. 5,2,9,1" class="setting-input" style="width:140px;" oninput="if(!playing) renderCompareContainers()">
       </div>
 
       <div id="status-strip" class="status-strip" style="width:100%; border-left:none; border-right:none; text-align:center;">Select an algorithm and click Sort.</div>
@@ -1975,6 +1975,8 @@
       for(let i=0; i<size; i++) {
           array.push(Math.floor(Math.random()*(max-min+1))+min);
       }
+      const ca = document.getElementById('custom-array');
+      if(ca) ca.value = '';
       
       if(!isCompareMode) renderArray();
       else renderCompareContainers();

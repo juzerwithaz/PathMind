@@ -1705,6 +1705,125 @@
     table { border-collapse: collapse; width: 100%; }
     th, td { border-bottom: 1px solid var(--rule); padding: 5px; }
     .r-crown { color: var(--path); font-size: 14px; }
+
+    .right-panel {
+      width: 340px;
+      background: var(--paper);
+      border-left: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow-y: auto;
+      z-index: 10;
+    }
+    
+    @media (max-width: 768px) {
+      .right-panel {
+        width: 100%;
+        border-left: none;
+        border-top: 1px solid var(--rule);
+      }
+    }
+
+    /* ── Modal ────────────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      box-shadow: var(--s-lg);
+      max-width: 700px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--rule);
+      background: var(--paper2);
+    }
+
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .modal-close {
+      all: unset;
+      cursor: pointer;
+      font-size: 20px;
+      color: var(--text-3);
+      padding: 4px 8px;
+      transition: color 0.15s;
+    }
+
+    .modal-close:hover {
+      color: var(--text);
+    }
+
+    .modal-body {
+      padding: 16px 20px;
+    }
+
+    .bench-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .bench-table th {
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 2px solid var(--rule);
+    }
+
+    .bench-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--rule);
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    .bench-table tr:hover td {
+      background: var(--paper2);
+    }
+
+    .bench-table .best {
+      color: var(--go);
+      font-weight: 800;
+      background: rgba(26, 122, 74, 0.08); /* highlight */
+    }
+
+    .bench-table .algo-name {
+      font-weight: 700;
+      color: var(--text);
+    }
   </style>
 </head>
 
@@ -1751,9 +1870,6 @@
       <div class="algo-list">
         <button class="algo-btn" id="btn-compare-mode" onclick="toggleCompareMode()"><div class="a-dot" style="background:var(--text)"></div>Start Compare Mode</button>
       </div>
-      <div class="info-panel">
-        <div class="info-inner" id="info-card"></div>
-      </div>
     </div>
 
     <!-- ── Center ──────────────────────────────────────────────── -->
@@ -1762,6 +1878,7 @@
       <div class="toolbar" id="main-toolbar">
          <button class="solve-btn" id="solve-btn-auto" onclick="runSorting(false)">▶ Auto Sort</button>
          <button class="solve-btn" id="solve-btn-manual" onclick="runSorting(true)" style="background:var(--paper3);color:var(--text);border-color:var(--rule2)">⏸ Manual Sort</button>
+         <button class="t-btn" id="benchmark-btn" onclick="runSortingBenchmark()" style="background:var(--text);color:var(--paper);border-color:var(--text);font-family:var(--font-display);letter-spacing:1px;text-transform:uppercase;">📊 Benchmark All</button>
          <button class="t-btn" id="gen-btn" onclick="genArray()">↻ New Array</button>
          <div class="t-sep"></div>
          <div class="speed-wrap">
@@ -1811,6 +1928,19 @@
       </div>
 
       <!-- Compare Results -->
+      <!-- Benchmark Modal -->
+      <div class="modal-overlay" id="benchmark-modal">
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-title">📊 Sorting Benchmark</div>
+            <button class="modal-close" onclick="closeSortingBenchmark()">×</button>
+          </div>
+          <div class="modal-body" id="benchmark-body">
+            <p style="color:var(--text-2);font-size:13px">Running all algorithms…</p>
+          </div>
+        </div>
+      </div>
+
       <div id="compare-results" style="display:none; margin-bottom:20px; padding:15px; background:var(--paper2); border:1px solid var(--rule); width:80%;">
         <table id="results-table">
           <thead><tr><th>Rank</th><th>Algorithm</th><th>Time (ms)</th></tr></thead>
@@ -1818,6 +1948,15 @@
         </table>
       </div>
     </div>
+
+    <!-- ── Right Panel ─────────────────────────────────────────── -->
+    <div class="right-panel" id="right-panel" style="display:none;">
+      <div class="panel-head">
+        <span class="panel-head-label">Algorithm Analysis</span>
+      </div>
+      <div class="info-inner" id="info-card"></div>
+    </div>
+
   </div>
 
   <script>
@@ -1839,80 +1978,111 @@
     const INFO = {
       merge: {
         name: 'Merge Sort',
-        desc: 'A divide and conquer algorithm that divides the array into halves, sorts them, and then merges them back together.',
+        desc: 'A divide-and-conquer algorithm that recursively splits the array in half, sorts each half, and systematically merges them back together into a single sorted array. It guarantees optimal worst-case time complexity.',
         recurrence: 'T(n) = 2T(n/2) + O(n)',
-        time: { best: 'O(n log n)', avg: 'O(n log n)', worst: 'O(n log n)' },
-        timeExp: 'Always divides exactly in half, hence the stable log n depth and linear merge.',
+        recurrenceExp: 'The array is split into 2 halves (2T(n/2)) and then merged back together with a linear scan (O(n)).',
+        time: { 
+          best: { val: 'O(n log n)', exp: 'Always splits even if sorted.' },
+          avg: { val: 'O(n log n)', exp: 'Divide-and-conquer overhead is constant.' },
+          worst: { val: 'O(n log n)', exp: 'Depth is fixed at log n levels.' }
+        },
         space: 'O(n)',
-        spaceExp: 'Requires auxiliary space during the merge phase.',
+        spaceExp: 'Requires auxiliary arrays during the merge phase to hold the split elements temporarily.',
         uses: [
-          ['External Sorting', 'Highly efficient for datasets too large to fit in memory (using tape/disk).'],
-          ['Linked Lists', 'Can be implemented on linked lists with O(1) extra space.']
-        ]
+          ['External Sorting', 'Highly efficient for datasets too large to fit in RAM (like massive databases).'],
+          ['Linked Lists', 'The naturally sequential merge makes it the king of sorting for linked structures.']
+        ],
+        intuition: 'Imagine sorting two small piles of cards and then merging them into one big pile by always picking the smaller card from the top of either pile.'
       },
       quick: {
         name: 'Quick Sort',
-        desc: 'A highly efficient, in-place, divide and conquer algorithm. It picks a pivot and partitions the array around it.',
+        desc: 'A highly efficient, in-place divide-and-conquer algorithm. It selects a pivot element, partitions the array so smaller elements are on the left and larger on the right, then recursively applies this to the sub-arrays.',
         recurrence: 'T(n) = T(k) + T(n-k-1) + O(n)',
-        time: { best: 'O(n log n)', avg: 'O(n log n)', worst: 'O(n²)' },
-        timeExp: 'Worst case occurs when array is already sorted and worst pivot is constantly chosen.',
+        recurrenceExp: 'Splits into two subproblems depending on the pivot position (k) and partitions with a linear scan.',
+        time: { 
+          best: { val: 'O(n log n)', exp: 'Pivot consistently lands exactly in the middle.' },
+          avg: { val: 'O(n log n)', exp: 'Dividing into unequal but reasonably sized parts.' },
+          worst: { val: 'O(n²)', exp: 'Pivot is always the minimum or maximum element.' }
+        },
         space: 'O(log n)',
-        spaceExp: 'In-place sorting, but recursive call stack takes O(log n) space.',
+        spaceExp: 'Though sorting in-place, the recursive call stack costs memory proportional to the tree depth.',
         uses: [
-          ['Commercial Computing', 'Often used in built-in sort functions (like C++ std::sort) because it caches extremely well.'],
-          ['In-Memory Sorting', 'When memory is tight, quick sort is preferred over merge sort.']
-        ]
+          ['Language Built-ins', 'Often the default built-in sort (e.g., C++ std::sort) due to cache locality.'],
+          ['Big Data', 'Preferred when memory is tight and worst-case risks can be mitigated by random pivots.']
+        ],
+        intuition: 'Pick a random number. Put everything smaller to the left and larger to the right. Repeat this until every single item is its own group.'
       },
       heap: {
         name: 'Heap Sort',
-        desc: 'Similar to selection sort but uses a max-heap data structure to efficiently find the maximum element.',
+        desc: 'An algorithm conceptually similar to selection sort, but it avoids blind linear scans by organizing the array into a max-heap data structure to instantly spot the largest element.',
         recurrence: 'N/A',
-        time: { best: 'O(n log n)', avg: 'O(n log n)', worst: 'O(n log n)' },
-        timeExp: 'Building the heap is O(n), and extracting maximum n times is O(n log n).',
+        recurrenceExp: 'Usually described via the iterative heapify properties rather than a simple recurrence.',
+        time: { 
+          best: { val: 'O(n log n)', exp: 'Distinct elements still require heap reconstruction.' },
+          avg: { val: 'O(n log n)', exp: 'Maintaining the heap property takes log n for each of n items.' },
+          worst: { val: 'O(n log n)', exp: 'The tree structure prevents any case from exceeding O(n log n).' }
+        },
         space: 'O(1)',
-        spaceExp: 'Entirely in-place manipulation of the array.',
+        spaceExp: 'Entirely in-place. It treats the existing array memory as a binary tree via index math.',
         uses: [
-          ['Embedded Systems', 'Favored in systems with strict memory bounds (Linux kernel usage).'],
-          ['Priority Queues', 'The heap structure itself perfectly implements priority queues.']
-        ]
+          ['Embedded Systems', 'Favored in critical environments (like OS kernels) where memory is strictly bounded.'],
+          ['Security', 'Used when worst-case predictable performance is required to avoid time-based attacks.']
+        ],
+        intuition: 'First, Organize the messy array into a organized "mountain" (max-heap). Then, repeatedly grab the king of the mountain and move him to the back.'
       },
       insertion: {
         name: 'Insertion Sort',
-        desc: 'Builds the final sorted array one item at a time by shifting elements to the right to make room.',
+        desc: 'Builds the final sorted array one element at a time. It iterates forward, pulling out the current element and shifting earlier elements to the right to make room for it to be inserted.',
         recurrence: 'N/A',
-        time: { best: 'O(n)', avg: 'O(n²)', worst: 'O(n²)' },
-        timeExp: 'Best case occurs when array is nearly or completely sorted (only a single check per element).',
+        recurrenceExp: 'Usually analyzed iteratively due to its simple nested-loop structure.',
+        time: { 
+          best: { val: 'O(n)', exp: 'Input is already sorted; zero shifts needed.' },
+          avg: { val: 'O(n²)', exp: 'Each element moves halfway through the sorted section on average.' },
+          worst: { val: 'O(n²)', exp: 'Input is reversed; every element must shift to the start.' }
+        },
         space: 'O(1)',
-        spaceExp: 'Sorts entirely in place.',
+        spaceExp: 'Only requires a single variable to hold the current key being inserted.',
         uses: [
-          ['Nearly Sorted Data', 'Extremely fast and adaptive on arrays that are already mostly sorted.'],
-          ['Small Datasets', 'Often used iteratively for the smallest partitions inside quicksort (hybrid sorting e.g. Timsort).']
-        ]
+          ['Nearly Sorted Data', 'Extremely adaptive; it finishes in linear time if only a few items are displaced.'],
+          ['Hybrid Algorithms', 'Handles small partitions in algorithms like Timsort where complexity overhead is costly.']
+        ],
+        intuition: 'Like sorting a hand of cards: you pick one card at a time and slide it into the correct position among the cards you already hold.'
       },
       selection: {
         name: 'Selection Sort',
-        desc: 'Iteratively finds the minimum element in the unsorted portion and swaps it into the correct position.',
+        desc: 'Divides the array into sorted and unsorted sections. It repeatedly scans the unsorted section to blindly uncover the absolute minimum, then swaps it onto the sorted section.',
         recurrence: 'N/A',
-        time: { best: 'O(n²)', avg: 'O(n²)', worst: 'O(n²)' },
-        timeExp: 'Must always blindly scan the entire unsorted portion to confirm the minimum element.',
+        recurrenceExp: 'Uniformly iterative, it does not split into recursive subproblems.',
+        time: { 
+          best: { val: 'O(n²)', exp: 'It must check the entire unsorted list regardless of order.' },
+          avg: { val: 'O(n²)', exp: 'Performs (n-1) + (n-2) + ... + 1 comparisons every time.' },
+          worst: { val: 'O(n²)', exp: 'Input order does not change the amount of scanning required.' }
+        },
         space: 'O(1)',
-        spaceExp: 'Sorts entirely in place.',
+        spaceExp: 'No auxiliary storage needed; simply records the current minimum index.',
         uses: [
-          ['Flash Memory', 'Minimizes the absolute number of swaps (writes) made, extending memory lifespan.']
-        ]
+          ['Flash Memory', 'Minimizes the quantity of physical memory writes, extending hardware lifespan.'],
+          ['Minimal Swaps', 'Useful when moving data is significantly more expensive than comparing it.']
+        ],
+        intuition: 'Look at the whole messy pile, find the smallest item, and move it to the front. Repeat for the rest of the pile.'
       },
       bubble: {
         name: 'Bubble Sort',
-        desc: 'Repeatedly steps through the list, compares adjacent elements and swaps them if they are in the wrong order.',
+        desc: 'Repeatedly sweeps through the list, comparing adjacent elements and forcing them to swap if they are misaligned. The largest elements bubble to the top.',
         recurrence: 'N/A',
-        time: { best: 'O(n)', avg: 'O(n²)', worst: 'O(n²)' },
-        timeExp: 'If optimized, it runs in O(n) when the array is already sorted by breaking early without swaps.',
+        recurrenceExp: 'Defined by its simple iterative swapping mechanism.',
+        time: { 
+          best: { val: 'O(n)', exp: 'No swaps occur in the first pass; algorithm exits early.' },
+          avg: { val: 'O(n²)', exp: 'Pairs are swapped until the list is eventually stabilized.' },
+          worst: { val: 'O(n²)', exp: 'Reversed input requires the maximum possible number of swaps.' }
+        },
         space: 'O(1)',
-        spaceExp: 'Sorts entirely in place.',
+        spaceExp: 'Exclusively swaps adjacent elements in-place with zero extra memory.',
         uses: [
-          ['Educational', 'Primarily utilized to introduce the concept of sorting algorithms to students.'],
-          ['Computer Graphics', 'Detecting small errors in mostly-sorted polygon depth lists.']
-        ]
+          ['Education', 'Simplest algorithm for teaching beginners the mechanics of swapping and looping.'],
+          ['Graphics', 'Detecting small localized depth-buffer errors on almost-sorted lists.']
+        ],
+        intuition: 'Heavier items sink to the bottom. Each pass through the list pushes the next largest item to the end, just like bubbles rising in water.'
       }
     };
 
@@ -1937,14 +2107,25 @@
       
       let html = `<div class="algo-title-display">${i.name}</div>
         <div class="algo-desc">${i.desc}</div>
-        <div class="prop-row"><div class="prop-pill" style="border-color:var(--text-3);color:var(--text-2);background:var(--paper3);">${i.recurrence}</div></div>
         
-        <div class="complexity-row">
-            <div class="cx-card"><div class="cx-label">Time (Avg)</div><div class="cx-val">${i.time.avg}</div></div>
-            <div class="cx-card"><div class="cx-label">Space</div><div class="cx-val">${i.space}</div></div>
+        <div style="margin-top:12px;">
+           <div class="cx-label">Recurrence Relation</div>
+           <div style="font-family:var(--font-mono); font-size:11px; color:var(--hi); margin-top:2px; font-weight:700;">${i.recurrence}</div>
+           <div style="font-size:10px; color:var(--text-3); margin-top:2px;">${i.recurrenceExp}</div>
         </div>
         
-        <div style="font-size:10px; color:var(--text-2); margin-top:5px;"><b>Why?</b> ${i.timeExp} ${i.spaceExp}</div>
+        <div class="complexity-row" style="grid-template-columns: 1fr; margin-top:12px;">
+            <div class="cx-card"><div class="cx-label">Time Complexity</div>
+              <div style="font-size:10px; color:var(--text); margin-top:2px"><b style="color:var(--go);width:45px;display:inline-block;">Best:</b> <span style="font-weight:700;">${i.time.best.val}</span> — <span style="color:var(--text-3);">${i.time.best.exp}</span></div>
+              <div style="font-size:10px; color:var(--text); margin-top:2px"><b style="color:var(--path);width:45px;display:inline-block;">Avg:</b> <span style="font-weight:700;">${i.time.avg.val}</span> — <span style="color:var(--text-3);">${i.time.avg.exp}</span></div>
+              <div style="font-size:10px; color:var(--text); margin-top:2px"><b style="color:var(--stop);width:45px;display:inline-block;">Worst:</b> <span style="font-weight:700;">${i.time.worst.val}</span> — <span style="color:var(--text-3);">${i.time.worst.exp}</span></div>
+            </div>
+            <div class="cx-card"><div class="cx-label">Space Complexity: <span style="font-weight:700;color:var(--text);">${i.space}</span></div>
+              <div style="font-size:10px; color:var(--text-2); margin-top:4px;">${i.spaceExp}</div>
+            </div>
+        </div>
+        
+        <div style="font-size:10px; color:var(--text-2); margin-top:12px;"><b>Intuition:</b> ${i.intuition}</div>
         
         <div style="margin-top:10px; border-top:1px solid var(--rule); padding-top:10px;">
            <div class="cx-label">Use Cases</div>`;
@@ -2073,7 +2254,7 @@
         algos.forEach(a => {
             const wrap = document.createElement('div');
             wrap.className = 'c-wrap';
-            wrap.innerHTML = `<div class="c-title">${INFO[a].name}</div><div class="c-bars" id="cb-${a}"></div>`;
+            wrap.innerHTML = `<div class="c-title">${INFO[a].name} <span id="time-${a}" style="float:right; font-size:9px; font-weight:700; color:var(--text-3);"></span></div><div class="c-bars" id="cb-${a}"></div>`;
             sc.appendChild(wrap);
             
             const bcont = wrap.querySelector('.c-bars');
@@ -2184,6 +2365,16 @@
                 if (frameIdx < r.frames.length) {
                     advanced = true;
                     await executeFrame(r.frames[frameIdx], r.virtualArray, delay, `cb-${r.algo}-`);
+                    
+                    // Requirement: Only display time after this specific algorithm's animation has finished
+                    if (frameIdx === r.frames.length - 1) {
+                        const timeEl = document.getElementById(`time-${r.algo}`);
+                        if (timeEl) {
+                            timeEl.textContent = `${r.time}ms`;
+                            timeEl.style.color = 'var(--go)';
+                            timeEl.animate([{opacity:0},{opacity:1}], {duration:300});
+                        }
+                    }
                 }
             });
             await Promise.all(promises);
@@ -2373,11 +2564,11 @@
         setStatus("Racing " + algos.length + " algorithms on backend...");
         
         document.getElementById('compare-btn-auto').classList.add('active');
-        const tbd = document.getElementById('results-tbody');
-        tbd.innerHTML = `<tr><td colspan="3" style="text-align:center;">Executing...</td></tr>`;
-        document.getElementById('compare-results').style.display = 'block';
+        document.getElementById('compare-results').style.display = 'none';
 
         algos.forEach(a => {
+            const timeEl = document.getElementById(`time-${a}`);
+            if (timeEl) timeEl.textContent = '';
             for(let i=0; i<arr.length; i++) {
                 const b = document.getElementById(`cb-${a}-${i}`);
                 if (b) { b.classList.remove('sorted'); b.style.background=''; b.textContent = arr[i]; }
@@ -2396,15 +2587,6 @@
         compareResponses = await Promise.all(promises);
         compareResponses.sort((a,b) => a.time - b.time);
         
-        tbd.innerHTML = '';
-        compareResponses.forEach((r, idx) => {
-            tbd.innerHTML += `<tr>
-                <td>${idx+1} ${idx===0 ? '<span class="r-crown">👑</span>' : ''}</td>
-                <td><strong style="color:var(--text)">${INFO[r.algo].name}</strong></td>
-                <td>${r.time} ms</td>
-            </tr>`;
-        });
-        
         setStatus(manual ? "Race complete! Ready to step frames..." : "Race complete! Animating frames...");
         
         updateStepControls();
@@ -2414,8 +2596,73 @@
             await stepNext();
         }
         if (playing && !isPaused && frameIdx >= maxF) {
+            // Render results ONLY after animation is done
+            const tbd = document.getElementById('results-tbody');
+            tbd.innerHTML = '';
+            compareResponses.forEach((r, idx) => {
+                tbd.innerHTML += `<tr>
+                    <td>${idx+1} ${idx===0 ? '<span class="r-crown">👑</span>' : ''}</td>
+                    <td><strong style="color:var(--text)">${INFO[r.algo].name}</strong></td>
+                    <td>${r.time} ms</td>
+                </tr>`;
+            });
+            document.getElementById('compare-results').style.display = 'block';
             finishSortUI();
         }
+    }
+
+    // ── Benchmark ──────────────────────────────────────────────────
+    async function runSortingBenchmark() {
+      if (playing) stopRunning();
+      const m = document.getElementById('benchmark-modal');
+      const b = document.getElementById('benchmark-body');
+      m.classList.add('open');
+      b.innerHTML = '<p style="color:var(--text-2);font-size:13px">Generating random array and running all algorithms…</p>';
+      
+      let benchArr = [];
+      for(let i=0; i<100; i++) benchArr.push(Math.floor(Math.random()*100)+1);
+
+      try {
+        const res = await fetch('/api/sort_benchmark', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ array: benchArr })
+        });
+        const data = await res.json();
+        const records = Object.keys(data).map(algo => ({ algo, ...data[algo] }));
+        if (records.length === 0) return;
+
+        const bestTime = Math.min(...records.map(r => r.timeMs));
+        const bestComps = Math.min(...records.map(r => r.comparisons));
+        const bestSwaps = Math.min(...records.map(r => r.swaps));
+
+        let html = `<p style="font-size:10px; color:var(--text-3); margin-bottom:12px;">Array size: 100 elements. Winners highlighted in green.</p>`;
+        html += `<table class="bench-table"><thead><tr>
+                 <th>Algorithm</th><th>Time (ms)</th><th>Comparisons</th><th>Swaps</th><th>Space</th>
+                 </tr></thead><tbody>`;
+                 
+        records.sort((a, b) => a.timeMs - b.timeMs).forEach(r => {
+          const tCls = r.timeMs === bestTime ? 'best' : '';
+          const cCls = r.comparisons === bestComps ? 'best' : '';
+          const sCls = r.swaps === bestSwaps ? 'best' : '';
+          
+          html += `<tr>
+            <td class="algo-name">${INFO[r.algo].name}</td>
+            <td class="${tCls}">${r.timeMs}</td>
+            <td class="${cCls}">${r.comparisons}</td>
+            <td class="${sCls}">${r.swaps}</td>
+            <td>${r.space}</td>
+          </tr>`;
+        });
+        html += `</tbody></table>`;
+        b.innerHTML = html;
+        
+      } catch (e) {
+        b.innerHTML = '<p style="color:var(--stop);font-size:13px">Error executing benchmark. Check logs.</p>';
+      }
+    }
+
+    function closeSortingBenchmark() {
+      document.getElementById('benchmark-modal').classList.remove('open');
     }
 
     // Init

@@ -469,5 +469,34 @@ def api_sort():
         'timeMs': round((t1 - t0) * 1000, 3)
     })
 
+@app.route('/api/sort_benchmark', methods=['POST'])
+def sort_benchmark():
+    data = request.json
+    base_arr = list(data['array'])
+    results = {}
+    
+    space_complexities = {
+        'bubble': 'O(1)', 'selection': 'O(1)', 'insertion': 'O(1)',
+        'merge': 'O(n)', 'quick': 'O(log n)', 'heap': 'O(1)'
+    }
+    
+    for algo, func in SORT_ALGOS.items():
+        arr = list(base_arr)
+        t0 = time.perf_counter()
+        frames = func(arr)
+        elapsed = (time.perf_counter() - t0) * 1000
+        
+        comps = sum(1 for f in frames if f['t'] == 'compare')
+        swaps = sum(1 for f in frames if f['t'] in ('swap', 'set'))
+        
+        results[algo] = {
+            'timeMs': round(elapsed, 3),
+            'comparisons': comps,
+            'swaps': swaps,
+            'space': space_complexities.get(algo, 'Unknown')
+        }
+    return jsonify(results)
+
+
 if __name__ == '__main__':
     app.run(debug=False, port=5000)

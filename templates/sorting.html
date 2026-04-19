@@ -1950,7 +1950,7 @@
     </div>
 
     <!-- ── Right Panel ─────────────────────────────────────────── -->
-    <div class="right-panel" id="right-panel" style="display:none;">
+    <div class="right-panel" id="right-panel">
       <div class="panel-head">
         <span class="panel-head-label">Algorithm Analysis</span>
       </div>
@@ -2105,16 +2105,17 @@
       const i = INFO[activeAlgo];
       document.getElementById('hdr-algo-name').textContent = i.name;
       
-      let html = `<div class="algo-title-display">${i.name}</div>
+      let html = `
+        <div class="algo-title-display" style="color:var(--hi)">${i.name}</div>
         <div class="algo-desc">${i.desc}</div>
         
-        <div style="margin-top:12px;">
+        <div style="margin-top:10px; border-top:1px solid var(--rule); padding-top:10px;">
            <div class="cx-label">Recurrence Relation</div>
-           <div style="font-family:var(--font-mono); font-size:11px; color:var(--hi); margin-top:2px; font-weight:700;">${i.recurrence}</div>
+           <div style="font-family:var(--font-mono); font-size:11px; color:var(--hi); font-weight:700;">${i.recurrence}</div>
            <div style="font-size:10px; color:var(--text-3); margin-top:2px;">${i.recurrenceExp}</div>
         </div>
-        
-        <div class="complexity-row" style="grid-template-columns: 1fr; margin-top:12px;">
+
+        <div class="complexity-row" style="margin-top:12px; grid-template-columns: 1fr;">
             <div class="cx-card"><div class="cx-label">Time Complexity</div>
               <div style="font-size:10px; color:var(--text); margin-top:2px"><b style="color:var(--go);width:45px;display:inline-block;">Best:</b> <span style="font-weight:700;">${i.time.best.val}</span> — <span style="color:var(--text-3);">${i.time.best.exp}</span></div>
               <div style="font-size:10px; color:var(--text); margin-top:2px"><b style="color:var(--path);width:45px;display:inline-block;">Avg:</b> <span style="font-weight:700;">${i.time.avg.val}</span> — <span style="color:var(--text-3);">${i.time.avg.exp}</span></div>

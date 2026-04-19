@@ -1595,10 +1595,14 @@
       align-items: center;
       background: var(--paper2);
       border: 1px solid var(--rule);
-      padding: 12px;
-      border-radius: 8px;
+      padding: 16px;
+      border-radius: 12px;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: var(--s-sm);
+      width: 100%;
+      box-sizing: border-box;
+      overflow: hidden;
+      min-height: 0;
     }
     .c-grid-container:hover {
       box-shadow: var(--s-md);
@@ -1610,17 +1614,17 @@
       justify-content: space-between;
       align-items: center;
       font-family: var(--font-display);
-      font-size: 12px;
+      font-size: 14px;
       font-weight: 800;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
     .c-grid-stats {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       color: var(--text-3);
       background: var(--paper3);
-      padding: 2px 6px;
-      border-radius: 4px;
+      padding: 4px 8px;
+      border-radius: 6px;
       opacity: 0;
       transform: translateY(5px);
       transition: all 0.4s ease;
@@ -1628,6 +1632,22 @@
     .c-grid-stats.visible {
       opacity: 1;
       transform: translateY(0);
+    }
+    #compare-grid-wrap {
+      display: none;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 20px;
+      overflow-y: auto;
+      padding: 20px;
+      align-items: start;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+    }
+    @media (max-width: 900px) {
+      #compare-grid-wrap {
+        grid-template-columns: 1fr;
+      }
     }
 
     /* ── RESPONSIVE ───────────────────────────────────────────────── */
@@ -1858,8 +1878,7 @@
         </div>
       </div>
 
-      <div class="grid-wrap" id="compare-grid-wrap" style="display:none; flex-wrap:wrap; justify-content:center; gap:15px; overflow-y:auto; padding:15px; align-items:flex-start;">
-      </div>
+      <div class="grid-wrap" id="compare-grid-wrap"></div>
 
       <!-- Mobile stats -->
       <div class="m-stats">
@@ -2897,9 +2916,9 @@
       compareData = [];
 
       // Determine scale based on count
-      let scale = 0.55;
-      if (algos.length > 4) scale = 0.45;
-      if (algos.length <= 2) scale = 0.8;
+      let scale = 0.5;
+      if (algos.length <= 2) scale = 0.75;
+      if (algos.length === 1) scale = 0.9;
 
       algos.forEach(algo => {
         const info = ALGOS[algo];
@@ -2912,11 +2931,22 @@
         title.innerHTML = `<span>${info.name}</span><span id="c-stat-${algo}" class="c-grid-stats"></span>`;
         container.appendChild(title);
 
+        // Container to help with scaling without affecting outer flow
+        const gridHolder = document.createElement('div');
+        gridHolder.style.cssText = `width: 100%; display: flex; justify-content: center; overflow: hidden;`;
+
         const gridOuter = document.createElement('div');
         gridOuter.className = 'grid-outer';
         gridOuter.style.transform = `scale(${scale})`;
         gridOuter.style.transformOrigin = 'top center';
-        gridOuter.style.marginBottom = `-${(1 - scale) * 100}%`; // Hack to reduce spacing
+        
+        // Calculate height adjustment to prevent vertical gap
+        const baseHeight = (ROWS * 25); // Approximate cell height if not variable
+        // However, it's better to let the container clip or use a container with relative height
+        // But the user wants them fully contained. 
+        // We'll set a fixed height for the holder based on the scale to avoid overflow
+        const scaledHeight = (ROWS * 23 * scale); // 23 is roughly the cell size + border
+        gridHolder.style.height = `${scaledHeight + 40}px`;
 
         const gridEl = document.createElement('div');
         gridEl.style.display = 'grid';
@@ -2946,7 +2976,8 @@
           }
         }
         gridOuter.appendChild(gridEl);
-        container.appendChild(gridOuter);
+        gridHolder.appendChild(gridOuter);
+        container.appendChild(gridHolder);
         wrap.appendChild(container);
 
         compareData.push({ algo, cells: algoCells, visited: [], path: [], stats: null });

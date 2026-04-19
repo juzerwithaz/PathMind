@@ -1661,6 +1661,15 @@
         width: 100%;
         border-radius: 2px 2px 0 0;
         transition: height 0.05s linear;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        color: white;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 700;
+        overflow: hidden;
+        padding-bottom: 2px;
     }
     .bar.compare {
         background: var(--path);
@@ -1751,14 +1760,10 @@
     <div class="center">
       <!-- Toolbar -->
       <div class="toolbar" id="main-toolbar">
-         <button class="solve-btn" id="solve-btn" onclick="runSorting()">▶ Sort</button>
+         <button class="solve-btn" id="solve-btn-auto" onclick="runSorting(false)">▶ Auto Sort</button>
+         <button class="solve-btn" id="solve-btn-manual" onclick="runSorting(true)" style="background:var(--paper3);color:var(--text);border-color:var(--rule2)">⏸ Manual Sort</button>
          <button class="t-btn" id="gen-btn" onclick="genArray()">↻ New Array</button>
          <div class="t-sep"></div>
-         <div class="step-controls" id="step-controls" style="display:none; margin-left:10px;">
-            <button class="step-btn" id="btn-prev" onclick="doStepPrev()">⏮ Prev</button>
-            <button class="step-btn" id="btn-play" onclick="togglePlay()">⏸ Pause</button>
-            <button class="step-btn" id="btn-next" onclick="doStepNext()">Next ⏭</button>
-         </div>
          <div class="speed-wrap">
            <span>Size</span>
            <input type="range" id="arr-size" min="10" max="250" value="80" oninput="genArray()">
@@ -1774,7 +1779,8 @@
 
       <!-- Compare Toolbar -->
       <div class="toolbar" id="compare-toolbar" style="display:none;">
-         <button class="solve-btn" onclick="runCompare()">▶ Race All</button>
+         <button class="solve-btn" id="compare-btn-auto" onclick="runCompare(false)">▶ Auto Race</button>
+         <button class="solve-btn" id="compare-btn-manual" onclick="runCompare(true)" style="background:var(--paper3);color:var(--text);border-color:var(--rule2)">⏸ Manual Race</button>
          <button class="t-btn" onclick="genArray()">↻ Random</button>
          <button class="t-btn" onclick="closeCompareMode()">⊘ Exit Compare</button>
          <div class="t-sep"></div>
@@ -1792,6 +1798,11 @@
       <div id="status-strip" class="status-strip" style="width:100%; border-left:none; border-right:none; text-align:center;">Select an algorithm and click Sort.</div>
 
       <div class="grid-wrap" style="flex-direction:column; padding: 20px;">
+        <div class="step-controls" id="step-controls" style="display:none; justify-content:center; margin-bottom:15px;">
+            <button class="step-btn" id="btn-prev" onclick="doStepPrev()">⏮ Prev</button>
+            <button class="step-btn" id="btn-play" onclick="togglePlay()">⏸ Pause</button>
+            <button class="step-btn" id="btn-next" onclick="doStepNext()">Next ⏭</button>
+        </div>
         <div id="live-subtitle" class="live-subtitle" style="display:none; font-family:var(--font-display); font-size:16px; font-weight:700; margin-bottom:15px; color:var(--text); text-align:center;">Ready to sort.</div>
         <div id="visual-container" style="display:flex; width:100%; height:100%; align-items:flex-end; justify-content:center; gap: 2px;">
         </div>
@@ -1914,6 +1925,7 @@
     let isStepping = false;
     let frameIdx = 0;
     let virtualArray = [];
+    let compareResponses = [];
     
     function stopRunning() { playing = false; isPaused = false; isStepping = false; }
     function setStatus(msg) { document.getElementById('status-strip').textContent = msg; }
@@ -2030,6 +2042,7 @@
           bar.className = 'bar';
           bar.id = 'b-' + idx;
           bar.style.height = ((val / maxVal) * 100) + '%';
+          bar.textContent = val;
           container.appendChild(bar);
       });
       setStatus("Array initialized. Click Sort to begin.");
@@ -2070,6 +2083,7 @@
                 bar.className = 'bar';
                 bar.id = `cb-${a}-${idx}`;
                 bar.style.height = ((val / maxVal) * 100) + '%';
+                bar.textContent = val;
                 bcont.appendChild(bar);
             });
         });
@@ -2097,18 +2111,28 @@
         document.getElementById('step-controls').style.display = 'flex';
         document.getElementById('btn-play').textContent = isPaused ? "▶ Play" : "⏸ Pause";
         document.getElementById('btn-prev').disabled = isStepping || (!isPaused) || (frameIdx === 0);
-        document.getElementById('btn-next').disabled = isStepping || (!isPaused) || (frameIdx >= frames.length);
-        document.getElementById('btn-play').disabled = isStepping || (isPaused && frameIdx >= frames.length);
-        document.getElementById('solve-btn').textContent = isPaused ? "▶ Sort" : "Sorting...";
-        if(isPaused) document.getElementById('solve-btn').classList.remove('active');
-        else document.getElementById('solve-btn').classList.add('active');
+        
+        let maxF = isCompareMode ? Math.max(...compareResponses.map(r => r.frames.length), 0) : frames.length;
+        
+        document.getElementById('btn-next').disabled = isStepping || (!isPaused) || (frameIdx >= maxF);
+        document.getElementById('btn-play').disabled = isStepping || (isPaused && frameIdx >= maxF);
+        
+        if (!isCompareMode) {
+            document.getElementById('solve-btn-auto').textContent = isPaused ? "▶ Auto Sort" : "Sorting...";
+            if(isPaused) document.getElementById('solve-btn-auto').classList.remove('active');
+            else document.getElementById('solve-btn-auto').classList.add('active');
+        } else {
+            document.getElementById('compare-btn-auto').textContent = isPaused ? "▶ Auto Race" : "Racing...";
+            if(isPaused) document.getElementById('compare-btn-auto').classList.remove('active');
+            else document.getElementById('compare-btn-auto').classList.add('active');
+        }
     }
 
-    async function executeFrame(f, vArr, delay) {
+    async function executeFrame(f, vArr, delay, idPrefix = 'b-') {
         if (!playing) return;
-        const maxVal = Math.max(...array, 1);
-        const bi = document.getElementById('b-'+f.i);
-        const bj = f.j !== undefined ? document.getElementById('b-'+f.j) : null;
+        const maxVal = Math.max(...(isCompareMode ? vArr : array), 1);
+        const bi = document.getElementById(idPrefix+f.i);
+        const bj = f.j !== undefined ? document.getElementById(idPrefix+f.j) : null;
 
         if (f.t === 'compare') {
             if (bi) bi.style.background = 'var(--path)';
@@ -2122,7 +2146,9 @@
             vArr[f.j] = temp;
             if (bi && bj) {
                 bi.style.height = ((vArr[f.i] / maxVal) * 100) + '%';
+                bi.textContent = vArr[f.i];
                 bj.style.height = ((vArr[f.j] / maxVal) * 100) + '%';
+                bj.textContent = vArr[f.j];
                 bi.style.background = 'var(--stop)';
                 bj.style.background = 'var(--stop)';
                 if (delay) await sl(delay);
@@ -2133,6 +2159,7 @@
             vArr[f.i] = f.v;
             if (bi) {
                 bi.style.height = ((vArr[f.i] / maxVal) * 100) + '%';
+                bi.textContent = vArr[f.i];
                 bi.style.background = 'var(--go)';
                 if (delay) await sl(delay);
                 bi.style.background = '';
@@ -2141,44 +2168,57 @@
     }
 
     async function stepNext() {
-        if (frameIdx < frames.length && playing) {
-            let f = frames[frameIdx];
-            updateSubtitle(f, virtualArray);
+        let delayBase = 101 - document.getElementById('arr-speed').value;
+        let delay = isPaused ? 300 : (delayBase < 5 ? delayBase / 2 : delayBase);
 
-            let delayBase = 101 - document.getElementById('arr-speed').value;
-            let delay = isPaused ? 300 : (delayBase < 5 ? delayBase / 2 : delayBase);
-
-            await executeFrame(f, virtualArray, delay);
-            frameIdx++;
+        if (!isCompareMode) {
+            if (frameIdx < frames.length && playing) {
+                let f = frames[frameIdx];
+                updateSubtitle(f, virtualArray);
+                await executeFrame(f, virtualArray, delay);
+                frameIdx++;
+            }
+        } else {
+            let advanced = false;
+            let promises = compareResponses.map(async (r) => {
+                if (frameIdx < r.frames.length) {
+                    advanced = true;
+                    await executeFrame(r.frames[frameIdx], r.virtualArray, delay, `cb-${r.algo}-`);
+                }
+            });
+            await Promise.all(promises);
+            if (advanced) frameIdx++;
         }
     }
 
     async function togglePlay() {
-        if (frameIdx >= frames.length) return;
+        let maxF = isCompareMode ? Math.max(...compareResponses.map(r => r.frames.length), 0) : frames.length;
+        if (frameIdx >= maxF) return;
         isPaused = !isPaused;
         updateStepControls();
         if (!isPaused) {
-            while(playing && !isPaused && frameIdx < frames.length) {
+            while(playing && !isPaused && frameIdx < maxF) {
                 await stepNext();
             }
-            if (playing && !isPaused && frameIdx >= frames.length) {
-                document.getElementById('live-subtitle').textContent = "Sorting Complete.";
+            if (playing && !isPaused && frameIdx >= maxF) {
+                if(!isCompareMode) document.getElementById('live-subtitle').textContent = "Sorting Complete.";
                 finishSortUI();
             }
         }
     }
 
     async function doStepNext() {
-        if (isStepping || frameIdx >= frames.length) return;
+        let maxF = isCompareMode ? Math.max(...compareResponses.map(r => r.frames.length), 0) : frames.length;
+        if (isStepping || frameIdx >= maxF) return;
         isStepping = true;
         updateStepControls();
         
         await stepNext();
         
-        if (frameIdx < frames.length) {
-            updateSubtitle(frames[frameIdx], virtualArray);
+        if (frameIdx < maxF) {
+            if (!isCompareMode) updateSubtitle(frames[frameIdx], virtualArray);
         } else {
-            document.getElementById('live-subtitle').textContent = "Sorting Complete.";
+            if (!isCompareMode) document.getElementById('live-subtitle').textContent = "Sorting Complete.";
             finishSortUI();
         }
         
@@ -2187,25 +2227,37 @@
     }
 
     function fastForwardTo(targetIdx) {
-        virtualArray = [...array];
-        for (let i = 0; i < targetIdx; i++) {
-            let f = frames[i];
-            if (f.t === 'swap') {
-                let temp = virtualArray[f.i];
-                virtualArray[f.i] = virtualArray[f.j];
-                virtualArray[f.j] = temp;
-            } else if (f.t === 'set') {
-                virtualArray[f.i] = f.v;
+        if (!isCompareMode) {
+            virtualArray = [...array];
+            for (let i = 0; i < targetIdx; i++) {
+                let f = frames[i];
+                if (f.t === 'swap') { let t = virtualArray[f.i]; virtualArray[f.i] = virtualArray[f.j]; virtualArray[f.j] = t; }
+                else if (f.t === 'set') virtualArray[f.i] = f.v;
             }
-        }
-        const maxVal = Math.max(...array, 1);
-        for (let i = 0; i < virtualArray.length; i++) {
-            const b = document.getElementById('b-'+i);
-            if (b) {
-                b.style.height = ((virtualArray[i] / maxVal) * 100) + '%';
-                b.style.background = '';
-                b.classList.remove('sorted');
+            const maxVal = Math.max(...array, 1);
+            for (let i = 0; i < virtualArray.length; i++) {
+                const b = document.getElementById('b-'+i);
+                if (b) { b.style.height = ((virtualArray[i]/maxVal)*100)+'%'; b.textContent = virtualArray[i]; b.style.background=''; b.classList.remove('sorted'); }
             }
+        } else {
+            const custVal = document.getElementById('custom-array').value;
+            let initialArr = custVal ? custVal.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x)) : array;
+            if (initialArr.length === 0) initialArr = array;
+            const maxVal = Math.max(...initialArr, 1);
+
+            compareResponses.forEach(r => {
+                r.virtualArray = [...initialArr];
+                let limit = Math.min(targetIdx, r.frames.length);
+                for (let i = 0; i < limit; i++) {
+                    let f = r.frames[i];
+                    if (f.t === 'swap') { let t = r.virtualArray[f.i]; r.virtualArray[f.i] = r.virtualArray[f.j]; r.virtualArray[f.j] = t; }
+                    else if (f.t === 'set') r.virtualArray[f.i] = f.v;
+                }
+                for (let i = 0; i < r.virtualArray.length; i++) {
+                    const b = document.getElementById(`cb-${r.algo}-${i}`);
+                    if (b) { b.style.height = ((r.virtualArray[i]/maxVal)*100)+'%'; b.textContent = r.virtualArray[i]; b.style.background=''; b.classList.remove('sorted'); }
+                }
+            });
         }
     }
 
@@ -2214,42 +2266,63 @@
         isStepping = true;
         frameIdx--;
         fastForwardTo(frameIdx);
-        updateSubtitle(frameIdx >= 0 && frameIdx < frames.length ? frames[frameIdx] : null, virtualArray);
+        if (!isCompareMode) updateSubtitle(frameIdx >= 0 && frameIdx < frames.length ? frames[frameIdx] : null, virtualArray);
         isStepping = false;
         updateStepControls();
     }
 
     async function finishSortUI() {
         let delay = 101 - document.getElementById('arr-speed').value;
-        for(let i=0; i<array.length; i++) {
-            if(document.getElementById('b-'+i) && playing) {
-                document.getElementById('b-'+i).classList.add('sorted');
-                if (delay > 10) await sl(10);
+        if (!isCompareMode) {
+            for(let i=0; i<array.length; i++) {
+                if(document.getElementById('b-'+i) && playing) { document.getElementById('b-'+i).classList.add('sorted'); if (delay > 10) await sl(10); }
             }
+            setStatus(`Sort Complete!`);
+        } else {
+            const custVal = document.getElementById('custom-array').value;
+            let initialArr = custVal ? custVal.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x)) : array;
+            if (initialArr.length === 0) initialArr = array;
+            for(let i=0; i<initialArr.length; i++) {
+                compareResponses.forEach(r => {
+                    const bi = document.getElementById(`cb-${r.algo}-${i}`);
+                    if(bi && playing) bi.classList.add('sorted');
+                });
+                if (delay > 10 && playing) await sl(10);
+            }
+            setStatus(`Race complete!`);
         }
-        setStatus(`Sort Complete!`);
+        
         playing = false;
         isPaused = false;
         updateStepControls();
-        document.getElementById('solve-btn').textContent = "▶ Sort";
-        document.getElementById('solve-btn').classList.remove('active');
+        
+        if(!isCompareMode) {
+            document.getElementById('solve-btn-auto').textContent = "▶ Auto Sort";
+            document.getElementById('solve-btn-auto').classList.remove('active');
+            document.getElementById('live-subtitle').textContent = "Ready to sort.";
+        } else {
+            document.getElementById('compare-btn-auto').textContent = "▶ Auto Race";
+            document.getElementById('compare-btn-auto').classList.remove('active');
+        }
         document.getElementById('step-controls').style.display = 'none';
-        document.getElementById('live-subtitle').textContent = "Ready to sort.";
     }
 
-    async function runSorting() {
-        if(playing && !isPaused) return;
+    async function runSorting(manual) {
+        if (playing) {
+            if (isPaused && !manual) { togglePlay(); }
+            return;
+        }
         playing = true;
-        isPaused = false;
+        isPaused = manual;
         frameIdx = 0;
         virtualArray = [...array];
         
         for(let i=0; i<array.length; i++) {
-            if(document.getElementById('b-'+i)) document.getElementById('b-'+i).classList.remove('sorted');
+            const cb = document.getElementById('b-'+i);
+            if(cb) { cb.classList.remove('sorted'); cb.style.background=''; cb.textContent = array[i]; }
         }
 
-        document.getElementById('solve-btn').textContent = "Sorting...";
-        document.getElementById('solve-btn').classList.add('active');
+        document.getElementById('solve-btn-auto').classList.add('active');
         setStatus("Fetching algorithm execution from Python...");
         
         try {
@@ -2274,13 +2347,17 @@
         } catch(e) {
             setStatus("Error executing algorithm in backend.");
             playing = false;
-            document.getElementById('solve-btn').textContent = "▶ Sort";
-            document.getElementById('solve-btn').classList.remove('active');
+            document.getElementById('solve-btn-auto').textContent = "▶ Auto Sort";
+            document.getElementById('solve-btn-auto').classList.remove('active');
         }
     }
 
-    async function runCompare() {
-        if(playing) return;
+    async function runCompare(manual) {
+        if (playing) {
+            if (isPaused && !manual) togglePlay();
+            return;
+        }
+
         const algos = getCompareAlgos();
         if(algos.length < 2) { setStatus("Select at least 2 algorithms."); return; }
         
@@ -2290,33 +2367,37 @@
         if(arr.length === 0) { setStatus("Array is empty."); return; }
 
         playing = true;
+        isPaused = manual;
+        frameIdx = 0;
 
         setStatus("Racing " + algos.length + " algorithms on backend...");
         
-        let results = [];
+        document.getElementById('compare-btn-auto').classList.add('active');
         const tbd = document.getElementById('results-tbody');
         tbd.innerHTML = `<tr><td colspan="3" style="text-align:center;">Executing...</td></tr>`;
         document.getElementById('compare-results').style.display = 'block';
 
-        // Animate them together
-        const maxVal = Math.max(...arr) || 1;
+        algos.forEach(a => {
+            for(let i=0; i<arr.length; i++) {
+                const b = document.getElementById(`cb-${a}-${i}`);
+                if (b) { b.classList.remove('sorted'); b.style.background=''; b.textContent = arr[i]; }
+            }
+        });
 
-        // Fetch all independently
         const promises = algos.map(async a => {
             const res = await fetch('/api/sort', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ array: arr, algorithm: a })
             });
             const data = await res.json();
-            return { algo: a, time: data.timeMs, frames: data.frames };
+            return { algo: a, time: data.timeMs, frames: data.frames, virtualArray: [...arr] };
         });
 
-        const responses = await Promise.all(promises);
-        responses.sort((a,b) => a.time - b.time);
+        compareResponses = await Promise.all(promises);
+        compareResponses.sort((a,b) => a.time - b.time);
         
-        // Show actual results
         tbd.innerHTML = '';
-        responses.forEach((r, idx) => {
+        compareResponses.forEach((r, idx) => {
             tbd.innerHTML += `<tr>
                 <td>${idx+1} ${idx===0 ? '<span class="r-crown">👑</span>' : ''}</td>
                 <td><strong style="color:var(--text)">${INFO[r.algo].name}</strong></td>
@@ -2324,55 +2405,17 @@
             </tr>`;
         });
         
-        setStatus("Race complete! Backend execution times processed. Animating frames (simultaneous execution)...");
+        setStatus(manual ? "Race complete! Ready to step frames..." : "Race complete! Animating frames...");
+        
+        updateStepControls();
 
-        // Concurrent animation loops
-        const animPromises = responses.map(async r => {
-            let delay = 10;
-            for(let f of r.frames) {
-                if(f.t === 'compare') {
-                    const bi = document.getElementById(`cb-${r.algo}-${f.i}`);
-                    const bj = document.getElementById(`cb-${r.algo}-${f.j}`);
-                    if(bi && bj) {
-                        bi.style.background = 'var(--path)';
-                        bj.style.background = 'var(--path)';
-                        if(delay) await sl(delay);
-                        bi.style.background = '';
-                        bj.style.background = '';
-                    }
-                } else if(f.t === 'swap') {
-                    const bi = document.getElementById(`cb-${r.algo}-${f.i}`);
-                    const bj = document.getElementById(`cb-${r.algo}-${f.j}`);
-                    if(bi && bj) {
-                        const h = bi.style.height; bi.style.height = bj.style.height; bj.style.height = h;
-                        bi.style.background = 'var(--stop)';
-                        bj.style.background = 'var(--stop)';
-                        if(delay) await sl(delay);
-                        bi.style.background = '';
-                        bj.style.background = '';
-                    }
-                } else if(f.t === 'set') {
-                    const bi = document.getElementById(`cb-${r.algo}-${f.i}`);
-                    if(bi) {
-                        bi.style.height = ((f.v / maxVal) * 100) + '%';
-                        bi.style.background = 'var(--go)';
-                        if(delay) await sl(delay);
-                        bi.style.background = '';
-                    }
-                }
-            }
-            // Sweep
-            for(let i=0; i<arr.length; i++) {
-                const bi = document.getElementById(`cb-${r.algo}-${i}`);
-                if(bi) bi.style.background = 'var(--go)';
-                await sl(5);
-            }
-        });
-        
-        await Promise.all(animPromises);
-        setStatus("Animation complete!");
-        
-        playing = false;
+        let maxF = Math.max(...compareResponses.map(r => r.frames.length), 0);
+        while(playing && !isPaused && frameIdx < maxF) {
+            await stepNext();
+        }
+        if (playing && !isPaused && frameIdx >= maxF) {
+            finishSortUI();
+        }
     }
 
     // Init

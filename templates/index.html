@@ -1601,7 +1601,8 @@
       box-shadow: var(--s-sm);
       width: 100%;
       box-sizing: border-box;
-      overflow: hidden;
+      overflow-y: auto;
+      max-height: 450px;
       min-height: 0;
     }
     .c-grid-container:hover {
@@ -2916,9 +2917,9 @@
       compareData = [];
 
       // Determine scale based on count
-      let scale = 0.4;
-      if (algos.length <= 2) scale = 0.65;
-      if (algos.length === 1) scale = 0.8;
+      let scale = 0.55;
+      if (algos.length > 4) scale = 0.45;
+      if (algos.length <= 2) scale = 0.8;
 
       algos.forEach(algo => {
         const info = ALGOS[algo];
@@ -2945,8 +2946,8 @@
         // However, it's better to let the container clip or use a container with relative height
         // But the user wants them fully contained. 
         // We'll set a fixed height for the holder based on the scale to avoid overflow
-        const scaledHeight = (ROWS * 26 * scale); 
-        gridHolder.style.height = `${scaledHeight + 60}px`;
+        const scaledHeight = (ROWS * 23 * scale); 
+        gridHolder.style.height = `${scaledHeight + 40}px`;
 
         const gridEl = document.createElement('div');
         gridEl.style.display = 'grid';

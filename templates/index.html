@@ -4,10 +4,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PathMind</title>
+  <title>PathMind — AI Pathfinding Visualizer</title>
+  <meta name="description" content="Interactive pathfinding algorithm visualizer with BFS, DFS, UCS, DLS, A*, Greedy. Features weighted terrain, portals, waypoints, benchmarking and more.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
-    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,700;0,800;1,300&family=Syne:wght@700;800&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,700;0,800;1,300&family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;600&display=swap"
     rel="stylesheet">
   <style>
     *,
@@ -22,6 +23,7 @@
     :root {
       --font-display: 'Syne', sans-serif;
       --font-body: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
 
       --ink: #0f0e0d;
       --hdr-bg: #0f0e0d;
@@ -45,6 +47,12 @@
       --stop: #c0321a;
       --path: #d97706;
 
+      --sand-color: #e8c96a;
+      --water-color: #4a9ece;
+      --forest-color: #2d8a4e;
+      --waypoint-color: #8b5cf6;
+      --portal-color: #ec4899;
+
       --cell-size: 18px;
       --cell-bg: #ede9e1;
       --cell-wall: #b0aba0;
@@ -55,7 +63,6 @@
       --s-lg: 0 8px 32px rgba(0, 0, 0, 0.14);
 
       --r: 0px;
-      /* zero radius = brutalist */
     }
 
     [data-theme="dark"] {
@@ -79,6 +86,12 @@
       --go: #22c55e;
       --stop: #ef4444;
       --path: #fbbf24;
+
+      --sand-color: #c9a044;
+      --water-color: #3d7ea8;
+      --forest-color: #1f6b3a;
+      --waypoint-color: #a78bfa;
+      --portal-color: #f472b6;
 
       --cell-bg: #1a1814;
       --cell-wall: #3d3a35;
@@ -117,7 +130,6 @@
       overflow: hidden;
     }
 
-    /* Animated noise grain on header */
     header::before {
       content: '';
       position: absolute;
@@ -185,7 +197,6 @@
       font-weight: 700;
       letter-spacing: 2px;
       text-transform: uppercase;
-      color: rgba(128, 120, 110, 0.8);
       color: color-mix(in srgb, var(--hdr-fg) 45%, transparent);
     }
 
@@ -275,7 +286,6 @@
       color: var(--text-3);
     }
 
-    /* Algo list */
     .algo-list {
       display: flex;
       flex-direction: column;
@@ -468,8 +478,8 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
-      padding: 12px;
+      gap: 6px;
+      padding: 10px 12px;
       overflow: hidden;
       background: var(--paper);
       transition: background 0.3s;
@@ -519,7 +529,7 @@
     .toolbar {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
       flex-wrap: wrap;
       justify-content: center;
       width: 100%;
@@ -530,31 +540,20 @@
       all: unset;
       cursor: pointer;
       font-family: var(--font-body);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
-      padding: 6px 13px;
+      padding: 5px 10px;
       border: 1px solid var(--rule);
       color: var(--text-2);
       background: var(--paper2);
       transition: all 0.1s;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
       white-space: nowrap;
       letter-spacing: 0.2px;
       position: relative;
       overflow: hidden;
-    }
-
-    .t-btn::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: var(--hi);
-      transform: scaleX(0);
-      transform-origin: left;
-      transition: transform 0.15s;
-      z-index: 0;
     }
 
     .t-btn:hover {
@@ -567,27 +566,65 @@
       z-index: 1;
     }
 
-    .t-btn.wall-mode {
+    .t-btn.active {
+      border-color: var(--text-2);
+      color: var(--text);
+      background: var(--paper3);
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .t-btn.wall-active {
       border-color: var(--rule2);
       color: var(--text);
       background: var(--paper3);
     }
 
-    .t-btn.go-mode {
+    .t-btn.go-active {
       border-color: var(--go);
       color: var(--go);
       background: rgba(26, 122, 74, 0.08);
     }
 
-    .t-btn.stop-mode {
+    .t-btn.stop-active {
       border-color: var(--stop);
       color: var(--stop);
       background: rgba(192, 50, 26, 0.08);
     }
 
-    .t-btn.erase-mode {
+    .t-btn.sand-active {
+      border-color: var(--sand-color);
+      color: var(--sand-color);
+      background: rgba(232, 201, 106, 0.12);
+    }
+
+    .t-btn.water-active {
+      border-color: var(--water-color);
+      color: var(--water-color);
+      background: rgba(74, 158, 206, 0.12);
+    }
+
+    .t-btn.forest-active {
+      border-color: var(--forest-color);
+      color: var(--forest-color);
+      background: rgba(45, 138, 78, 0.12);
+    }
+
+    .t-btn.waypoint-active {
+      border-color: var(--waypoint-color);
+      color: var(--waypoint-color);
+      background: rgba(139, 92, 246, 0.12);
+    }
+
+    .t-btn.portal-active {
+      border-color: var(--portal-color);
+      color: var(--portal-color);
+      background: rgba(236, 72, 153, 0.12);
+    }
+
+    .t-btn.erase-active {
       border-color: var(--rule2);
       color: var(--text-2);
+      background: var(--paper3);
     }
 
     .t-sep {
@@ -602,9 +639,9 @@
       all: unset;
       cursor: pointer;
       font-family: var(--font-display);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 800;
-      padding: 7px 28px;
+      padding: 6px 22px;
       letter-spacing: 1px;
       text-transform: uppercase;
       background: var(--hi);
@@ -652,7 +689,7 @@
     .speed-wrap {
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 6px;
       font-size: 10px;
       font-weight: 700;
       letter-spacing: 0.3px;
@@ -660,7 +697,7 @@
     }
 
     .speed-wrap input[type=range] {
-      width: 72px;
+      width: 60px;
       accent-color: var(--hi);
       cursor: pointer;
     }
@@ -668,21 +705,66 @@
     .dls-wrap {
       display: none;
       align-items: center;
-      gap: 7px;
+      gap: 6px;
       font-size: 10px;
       font-weight: 700;
       color: var(--text-3);
     }
 
     .dls-wrap input[type=number] {
-      width: 48px;
+      width: 44px;
       background: var(--paper2);
       border: 1px solid var(--rule);
       color: var(--text);
       font-family: var(--font-body);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
-      padding: 4px 8px;
+      padding: 3px 6px;
+    }
+
+    /* ── Step Controls ────────────────────────────────────────────── */
+    .step-controls {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .step-controls.visible {
+      display: flex;
+    }
+
+    .step-btn {
+      all: unset;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border: 1px solid var(--rule);
+      color: var(--text-2);
+      background: var(--paper2);
+      transition: all 0.1s;
+    }
+
+    .step-btn:hover {
+      color: var(--text);
+      border-color: var(--hi);
+      background: var(--hi-light);
+    }
+
+    .step-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .step-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-3);
+      min-width: 80px;
+      text-align: center;
     }
 
     /* ── Grid ─────────────────────────────────────────────────────── */
@@ -727,6 +809,18 @@
       background: var(--cell-wall);
     }
 
+    .cell.sand {
+      background: var(--sand-color);
+    }
+
+    .cell.water {
+      background: var(--water-color);
+    }
+
+    .cell.forest {
+      background: var(--forest-color);
+    }
+
     .cell.start {
       background: var(--go) !important;
     }
@@ -751,12 +845,54 @@
       clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
     }
 
+    .cell.waypoint {
+      background: var(--waypoint-color) !important;
+    }
+
+    .cell.waypoint::before {
+      content: attr(data-wp-num);
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 9px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .cell.portal {
+      background: var(--portal-color) !important;
+      animation: portalPulse 2s ease-in-out infinite;
+    }
+
+    .cell.portal::before {
+      content: '⬡';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    @keyframes portalPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
     .cell.visited {
       animation: vCell 0.2s ease-out forwards;
     }
 
     .cell.path {
       animation: pCell 0.25s ease-out forwards;
+    }
+
+    .cell.heatmap {
+      transition: background 0.15s;
     }
 
     @keyframes vCell {
@@ -790,23 +926,6 @@
       }
     }
 
-    [data-theme="dark"] @keyframes vCell {
-      0% {
-        background: var(--hi);
-        transform: scale(0.5);
-      }
-
-      50% {
-        background: rgba(255, 85, 51, 0.5);
-        transform: scale(1.08);
-      }
-
-      100% {
-        background: rgba(255, 85, 51, 0.15);
-        transform: scale(1);
-      }
-    }
-
     /* Scan pulse while solving */
     .grid-outer::after {
       content: '';
@@ -836,8 +955,8 @@
 
     /* ── Right Panel ──────────────────────────────────────────────── */
     .right-panel {
-      width: 196px;
-      min-width: 196px;
+      width: 210px;
+      min-width: 210px;
       background: var(--paper2);
       border-left: 1px solid var(--rule);
       display: flex;
@@ -849,7 +968,7 @@
     }
 
     .rp-block {
-      padding: 14px 14px;
+      padding: 12px 14px;
       border-bottom: 1px solid var(--rule);
     }
 
@@ -864,12 +983,21 @@
       letter-spacing: 2.5px;
       text-transform: uppercase;
       color: var(--text-3);
-      margin-bottom: 10px;
+      margin-bottom: 8px;
+    }
+
+    .rp-head.clickable {
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    .rp-head.clickable:hover {
+      color: var(--text-2);
     }
 
     /* Status */
     .status-strip {
-      padding: 8px 10px;
+      padding: 7px 10px;
       border: 1px solid var(--rule);
       background: var(--paper);
       font-size: 10px;
@@ -903,12 +1031,12 @@
 
     .stat-row {
       background: var(--paper);
-      padding: 9px 12px;
+      padding: 7px 10px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      min-height: 42px;
+      min-height: 36px;
     }
 
     .stat-lbl {
@@ -922,7 +1050,7 @@
 
     .stat-num {
       font-family: var(--font-display);
-      font-size: 22px;
+      font-size: 18px;
       font-weight: 800;
       line-height: 1;
       color: var(--text);
@@ -949,11 +1077,99 @@
       color: var(--stop);
     }
 
+    /* Settings */
+    .settings-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .setting-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-2);
+      min-width: 38px;
+    }
+
+    .setting-input {
+      width: 50px;
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 6px;
+    }
+
+    .setting-btn {
+      all: unset;
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border: 1px solid var(--rule);
+      color: var(--text-2);
+      background: var(--paper);
+      transition: all 0.1s;
+    }
+
+    .setting-btn:hover {
+      color: var(--text);
+      border-color: var(--rule2);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-2);
+      cursor: pointer;
+    }
+
+    .toggle-row input[type="checkbox"] {
+      accent-color: var(--hi);
+      cursor: pointer;
+    }
+
+    /* Pseudocode */
+    .pseudocode-wrap {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .pseudocode-wrap.open {
+      max-height: 300px;
+    }
+
+    .pseudocode {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      line-height: 1.7;
+      color: var(--text-2);
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      padding: 8px 10px;
+      overflow-x: auto;
+      white-space: pre;
+      scrollbar-width: thin;
+    }
+
     /* Legend */
     .legend {
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 4px;
     }
 
     .leg {
@@ -966,17 +1182,25 @@
     }
 
     .leg-sw {
-      width: 14px;
-      height: 14px;
+      width: 12px;
+      height: 12px;
       flex-shrink: 0;
       border: 1px solid var(--rule);
+    }
+
+    .leg-cost {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 600;
+      color: var(--text-3);
     }
 
     /* Presets */
     .preset-list {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
     }
 
     .preset-btn {
@@ -985,7 +1209,7 @@
       font-family: var(--font-body);
       font-size: 10px;
       font-weight: 700;
-      padding: 7px 10px;
+      padding: 6px 10px;
       border: 1px solid var(--rule);
       color: var(--text-2);
       background: var(--paper);
@@ -1015,6 +1239,280 @@
       transform: translateX(2px);
     }
 
+    /* Actions */
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+
+    .action-btn {
+      all: unset;
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-size: 9px;
+      font-weight: 700;
+      padding: 7px 6px;
+      border: 1px solid var(--rule);
+      color: var(--text-2);
+      background: var(--paper);
+      transition: all 0.1s;
+      text-align: center;
+      letter-spacing: 0.2px;
+    }
+
+    .action-btn:hover {
+      color: var(--text);
+      border-color: var(--rule2);
+      background: var(--paper3);
+    }
+
+    .action-btn.primary {
+      background: var(--hi);
+      color: #fff;
+      border-color: var(--hi);
+      grid-column: span 2;
+    }
+
+    .action-btn.primary:hover {
+      opacity: 0.9;
+    }
+
+    /* ── Modal ────────────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      box-shadow: var(--s-lg);
+      max-width: 650px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--rule);
+      background: var(--paper2);
+    }
+
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .modal-close {
+      all: unset;
+      cursor: pointer;
+      font-size: 20px;
+      color: var(--text-3);
+      padding: 4px 8px;
+      transition: color 0.15s;
+    }
+
+    .modal-close:hover {
+      color: var(--text);
+    }
+
+    .modal-body {
+      padding: 16px 20px;
+    }
+
+    /* Benchmark table */
+    .bench-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .bench-table th {
+      font-family: var(--font-display);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-3);
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 2px solid var(--rule);
+    }
+
+    .bench-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--rule);
+      font-weight: 600;
+      color: var(--text-2);
+    }
+
+    .bench-table tr:hover td {
+      background: var(--paper2);
+    }
+
+    .bench-table .best {
+      color: var(--go);
+      font-weight: 800;
+    }
+
+    .bench-table .algo-name {
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .bench-table .not-found {
+      color: var(--stop);
+    }
+
+    .bench-bar {
+      height: 4px;
+      background: var(--hi);
+      margin-top: 3px;
+      transition: width 0.3s;
+    }
+
+    /* Challenge cards */
+    .challenge-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .challenge-card {
+      border: 1px solid var(--rule);
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: var(--paper2);
+    }
+
+    .challenge-card:hover {
+      border-color: var(--hi);
+      background: var(--hi-light);
+    }
+
+    .challenge-name {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .challenge-desc {
+      font-size: 11px;
+      color: var(--text-2);
+      line-height: 1.5;
+    }
+
+    .challenge-hint {
+      margin-top: 8px;
+      font-size: 10px;
+      color: var(--text-3);
+      font-style: italic;
+    }
+
+    /* ── Tutorial ─────────────────────────────────────────────────── */
+    .tutorial-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(2px);
+    }
+
+    .tutorial-overlay.open {
+      display: flex;
+    }
+
+    .tutorial-card {
+      background: var(--paper);
+      border: 2px solid var(--hi);
+      box-shadow: var(--s-lg);
+      padding: 24px 28px;
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .tutorial-step-num {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-3);
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .tutorial-title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .tutorial-text {
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text-2);
+      margin-bottom: 20px;
+    }
+
+    .tutorial-nav {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .tutorial-btn {
+      all: unset;
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 8px 24px;
+      border: 1px solid var(--rule);
+      color: var(--text-2);
+      transition: all 0.15s;
+    }
+
+    .tutorial-btn:hover {
+      color: var(--text);
+      border-color: var(--rule2);
+    }
+
+    .tutorial-btn.primary {
+      background: var(--hi);
+      color: #fff;
+      border-color: var(--hi);
+    }
+
+    .tutorial-btn.primary:hover {
+      opacity: 0.9;
+    }
+
     /* ── Mobile stats ─────────────────────────────────────────────── */
     .m-stats {
       display: none;
@@ -1031,7 +1529,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 7px 4px;
+      padding: 5px 4px;
     }
 
     .m-stat-l {
@@ -1044,26 +1542,50 @@
 
     .m-stat-v {
       font-family: var(--font-display);
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 800;
       color: var(--text);
       line-height: 1.2;
     }
 
-    .m-stat-v.hi {
-      color: var(--hi);
+    .m-stat-v.hi { color: var(--hi); }
+    .m-stat-v.amber { color: var(--path); }
+    .m-stat-v.go { color: var(--go); }
+    .m-stat-v.stop { color: var(--stop); }
+
+    /* ── Efficiency badge ─────────────────────────────────────────── */
+    .efficiency-badge {
+      display: none;
+      padding: 6px 10px;
+      border: 1px solid var(--rule);
+      background: var(--paper);
+      text-align: center;
+      margin-top: 8px;
     }
 
-    .m-stat-v.amber {
-      color: var(--path);
+    .efficiency-badge.visible {
+      display: block;
     }
 
-    .m-stat-v.go {
-      color: var(--go);
+    .eff-label {
+      font-size: 7.5px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-3);
     }
 
-    .m-stat-v.stop {
-      color: var(--stop);
+    .eff-value {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 800;
+      margin-top: 2px;
+    }
+
+    .eff-grade {
+      font-size: 9px;
+      font-weight: 700;
+      margin-top: 2px;
     }
 
     /* ── RESPONSIVE ───────────────────────────────────────────────── */
@@ -1118,8 +1640,8 @@
       }
 
       .center {
-        padding: 8px;
-        gap: 6px;
+        padding: 6px;
+        gap: 4px;
       }
 
       .m-stats {
@@ -1151,6 +1673,7 @@
 
     <div class="header-right">
       <button class="hdr-btn menu-hdr-btn" onclick="toggleMenu()">☰ Menu</button>
+      <button class="hdr-btn" onclick="openTutorial()">📖 Guide</button>
       <button class="hdr-btn" onclick="toggleTheme()">
         <span class="theme-icon" id="theme-icon">🌙</span>
         <span id="theme-label">Dark</span>
@@ -1207,22 +1730,27 @@
             style="color:#db2777">●</span>Greedy</button>
       </div>
 
-      <!-- Toolbar 1 -->
+      <!-- Toolbar 1: Drawing tools -->
       <div class="toolbar">
-        <button class="t-btn wall-mode" id="tool-wall" onclick="setMode('wall')">▪ Wall</button>
-        <button class="t-btn erase-mode" id="tool-erase" onclick="setMode('erase')">✕ Erase</button>
-        <button class="t-btn go-mode" id="tool-start" onclick="setMode('start')">▲ Start</button>
-        <button class="t-btn stop-mode" id="tool-end" onclick="setMode('end')">★ End</button>
+        <button class="t-btn wall-active" id="tool-wall" onclick="setMode('wall')">🧱 Wall</button>
+        <button class="t-btn" id="tool-erase" onclick="setMode('erase')">✕ Erase</button>
+        <button class="t-btn" id="tool-start" onclick="setMode('start')">▲ Start</button>
+        <button class="t-btn" id="tool-end" onclick="setMode('end')">★ End</button>
         <div class="t-sep"></div>
-        <button class="t-btn" onclick="generateMaze('random')">Random</button>
-        <button class="t-btn" onclick="generateMaze('recursive')">Maze</button>
-        <button class="t-btn" onclick="generateMaze('spiral')">Spiral</button>
+        <button class="t-btn" id="tool-sand" onclick="setMode('sand')">🏖️ Sand</button>
+        <button class="t-btn" id="tool-water" onclick="setMode('water')">💧 Water</button>
+        <button class="t-btn" id="tool-forest" onclick="setMode('forest')">🌲 Forest</button>
         <div class="t-sep"></div>
+        <button class="t-btn" id="tool-waypoint" onclick="setMode('waypoint')">📍 Waypoint</button>
+        <button class="t-btn" id="tool-portal" onclick="setMode('portal')">🌀 Portal</button>
+        <div class="t-sep"></div>
+        <button class="t-btn" onclick="undoAction()" title="Undo (Ctrl+Z)">↶</button>
+        <button class="t-btn" onclick="redoAction()" title="Redo (Ctrl+Y)">↷</button>
         <button class="t-btn" onclick="clearViz()">↺ Clear</button>
         <button class="t-btn" onclick="resetAll()">⊘ Reset</button>
       </div>
 
-      <!-- Toolbar 2 -->
+      <!-- Toolbar 2: Solve & settings -->
       <div class="toolbar">
         <button class="solve-btn" id="solve-btn" onclick="runSolve()">▶ Visualize</button>
         <div class="t-sep"></div>
@@ -1236,6 +1764,19 @@
           <span>Limit</span>
           <input type="number" id="dls-limit" value="25" min="1" max="150">
         </div>
+        <div class="t-sep"></div>
+        <label class="toggle-row" title="Allow 8-directional movement">
+          <input type="checkbox" id="diagonal-toggle" onchange="toggleDiagonal()"> Diagonal
+        </label>
+      </div>
+
+      <!-- Step controls (hidden by default) -->
+      <div class="step-controls" id="step-controls">
+        <button class="step-btn" onclick="stepFirst()" title="First">|◄</button>
+        <button class="step-btn" onclick="stepPrev()" title="Previous">◄</button>
+        <span class="step-label" id="step-label">Step 0 / 0</span>
+        <button class="step-btn" onclick="stepNext()" title="Next">►</button>
+        <button class="step-btn" onclick="stepLast()" title="Last">►|</button>
       </div>
 
       <!-- Grid -->
@@ -1257,11 +1798,11 @@
         </div>
         <div class="m-stat">
           <div class="m-stat-l">Time</div>
-          <div class="m-stat-v" id="ms-time" style="font-size:12px">—</div>
+          <div class="m-stat-v" id="ms-time" style="font-size:11px">—</div>
         </div>
         <div class="m-stat">
           <div class="m-stat-l">Result</div>
-          <div class="m-stat-v" id="ms-found" style="font-size:12px">—</div>
+          <div class="m-stat-v" id="ms-found" style="font-size:11px">—</div>
         </div>
       </div>
 
@@ -1295,29 +1836,53 @@
             <div class="stat-num" id="s-found">—</div>
           </div>
         </div>
+        <div class="efficiency-badge" id="eff-badge">
+          <div class="eff-label">Efficiency</div>
+          <div class="eff-value" id="eff-value">—</div>
+          <div class="eff-grade" id="eff-grade"></div>
+        </div>
+      </div>
+
+      <div class="rp-block">
+        <div class="rp-head">Settings</div>
+        <div class="settings-grid">
+          <div class="setting-row">
+            <span class="setting-label">Rows</span>
+            <input class="setting-input" type="number" id="grid-rows" value="20" min="5" max="50">
+            <span class="setting-label">Cols</span>
+            <input class="setting-input" type="number" id="grid-cols" value="35" min="5" max="80">
+            <button class="setting-btn" onclick="resizeGrid()">Apply</button>
+          </div>
+          <label class="toggle-row">
+            <input type="checkbox" id="step-toggle" onchange="toggleStepMode()"> Step-by-Step Mode
+          </label>
+          <label class="toggle-row">
+            <input type="checkbox" id="heatmap-toggle" onchange="toggleHeatmap()"> Heatmap Overlay
+          </label>
+        </div>
+      </div>
+
+      <div class="rp-block">
+        <div class="rp-head clickable" onclick="togglePseudo()">Pseudocode ▾</div>
+        <div class="pseudocode-wrap" id="pseudo-wrap">
+          <pre class="pseudocode" id="pseudo-code"></pre>
+        </div>
       </div>
 
       <div class="rp-block">
         <div class="rp-head">Legend</div>
         <div class="legend">
-          <div class="leg">
-            <div class="leg-sw" style="background:var(--cell-bg)"></div>Empty
-          </div>
-          <div class="leg">
-            <div class="leg-sw" style="background:var(--cell-wall)"></div>Wall
-          </div>
-          <div class="leg">
-            <div class="leg-sw" style="background:var(--go)"></div>Start ▲
-          </div>
-          <div class="leg">
-            <div class="leg-sw" style="background:var(--stop)"></div>End ★
-          </div>
-          <div class="leg">
-            <div class="leg-sw" style="background:rgba(232,56,13,0.18);border-color:rgba(232,56,13,0.3)"></div>Explored
-          </div>
-          <div class="leg">
-            <div class="leg-sw" style="background:var(--path)"></div>Path
-          </div>
+          <div class="leg"><div class="leg-sw" style="background:var(--cell-bg)"></div>Empty<span class="leg-cost">×1</span></div>
+          <div class="leg"><div class="leg-sw" style="background:var(--cell-wall)"></div>Wall<span class="leg-cost">∞</span></div>
+          <div class="leg"><div class="leg-sw" style="background:var(--sand-color)"></div>Sand<span class="leg-cost">×3</span></div>
+          <div class="leg"><div class="leg-sw" style="background:var(--water-color)"></div>Water<span class="leg-cost">×5</span></div>
+          <div class="leg"><div class="leg-sw" style="background:var(--forest-color)"></div>Forest<span class="leg-cost">×8</span></div>
+          <div class="leg"><div class="leg-sw" style="background:var(--go)"></div>Start ▲</div>
+          <div class="leg"><div class="leg-sw" style="background:var(--stop)"></div>End ★</div>
+          <div class="leg"><div class="leg-sw" style="background:var(--waypoint-color)"></div>Waypoint 📍</div>
+          <div class="leg"><div class="leg-sw" style="background:var(--portal-color)"></div>Portal 🌀</div>
+          <div class="leg"><div class="leg-sw" style="background:rgba(232,56,13,0.18);border-color:rgba(232,56,13,0.3)"></div>Explored</div>
+          <div class="leg"><div class="leg-sw" style="background:var(--path)"></div>Path</div>
         </div>
       </div>
 
@@ -1327,6 +1892,21 @@
           <button class="preset-btn" onclick="generateMaze('random')">Random walls</button>
           <button class="preset-btn" onclick="generateMaze('recursive')">Recursive division</button>
           <button class="preset-btn" onclick="generateMaze('spiral')">Spiral corridor</button>
+          <button class="preset-btn" onclick="generateMaze('prim')">Prim's maze</button>
+          <button class="preset-btn" onclick="generateMaze('kruskal')">Kruskal's maze</button>
+          <button class="preset-btn" onclick="generateMaze('cave')">Cave automata</button>
+        </div>
+      </div>
+
+      <div class="rp-block">
+        <div class="rp-head">Actions</div>
+        <div class="action-grid">
+          <button class="action-btn primary" id="benchmark-btn" onclick="runBenchmark()">📊 Benchmark All</button>
+          <button class="action-btn" onclick="openChallenges()">🏆 Challenges</button>
+          <button class="action-btn" onclick="openTutorial()">📖 Tutorial</button>
+          <button class="action-btn" onclick="exportGrid()">⬇ Export</button>
+          <button class="action-btn" onclick="importGrid()">⬆ Import</button>
+          <button class="action-btn" onclick="screenshot()">📸 Screenshot</button>
         </div>
       </div>
 
@@ -1334,8 +1914,49 @@
 
   </div>
 
+  <!-- ── Benchmark Modal ──────────────────────────────────────── -->
+  <div class="modal-overlay" id="benchmark-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">📊 Algorithm Benchmark</div>
+        <button class="modal-close" onclick="closeBenchmark()">×</button>
+      </div>
+      <div class="modal-body" id="benchmark-body">
+        <p style="color:var(--text-2);font-size:13px">Running all algorithms…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Challenge Modal ──────────────────────────────────────── -->
+  <div class="modal-overlay" id="challenge-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">🏆 Challenges</div>
+        <button class="modal-close" onclick="closeChallenges()">×</button>
+      </div>
+      <div class="modal-body" id="challenge-body"></div>
+    </div>
+  </div>
+
+  <!-- ── Tutorial Overlay ─────────────────────────────────────── -->
+  <div class="tutorial-overlay" id="tutorial-overlay">
+    <div class="tutorial-card">
+      <div class="tutorial-step-num" id="tutorial-step-num">Step 1 of 10</div>
+      <div class="tutorial-title" id="tutorial-title">Welcome</div>
+      <div class="tutorial-text" id="tutorial-text">Welcome to PathMind!</div>
+      <div class="tutorial-nav">
+        <button class="tutorial-btn" onclick="closeTutorial()">Skip</button>
+        <button class="tutorial-btn" id="tutorial-prev" onclick="tutorialPrev()">← Back</button>
+        <button class="tutorial-btn primary" id="tutorial-next" onclick="tutorialNext()">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file input for import -->
+  <input type="file" id="file-input" accept=".json" style="display:none" onchange="handleImport(event)">
+
   <script>
-    // ── Theme ─────────────────────────────────────────────────────────────────────
+    // ── Theme ──────────────────────────────────────────────────────────────────────
     let dark = false;
     function toggleTheme() {
       dark = !dark;
@@ -1344,17 +1965,8 @@
       document.getElementById('theme-label').textContent = dark ? 'Light' : 'Dark';
     }
 
-    // ── Grid dims ─────────────────────────────────────────────────────────────────
-    function gridDims() {
-      const w = window.innerWidth;
-      if (w <= 380) return [14, 20];
-      if (w <= 600) return [16, 24];
-      if (w <= 960) return [18, 28];
-      return [20, 35];
-    }
-
-    let ROWS, COLS, grid = [], cells = [], startNode, endNode;
-    let mode = 'wall', mouseDown = false, animating = false, currentAlgo = 'bfs';
+    // ── Constants ──────────────────────────────────────────────────────────────────
+    const DIRS_4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
     const ALGOS = {
       bfs: { name: 'Breadth-First Search', dot: '#e8380d', ds: 'Queue (FIFO)', time: 'O(V+E)', space: 'O(V)', opt: true, cmp: true, desc: 'Explores all neighbours at current depth before going deeper. FIFO queue guarantees the shortest path in unweighted grids.', tags: ['Queue', 'Uninformed', 'Optimal', 'Complete'] },
@@ -1365,14 +1977,238 @@
       greedy: { name: 'Greedy Best-First', dot: '#db2777', ds: 'Priority Queue (h only)', time: 'O(V logV)', space: 'O(V)', opt: false, cmp: false, desc: 'Races toward the goal using h(n) alone — ignores true cost. Often fast, but trades optimality for speed.', tags: ['Informed', 'Heuristic only', 'Generate & Test'] },
     };
 
+    const PSEUDOCODE = {
+      bfs: `BFS(grid, start, goal):
+  queue ← [start]
+  parent ← {start: null}
+
+  while queue not empty:
+    node ← queue.dequeue()      // FIFO
+    if node = goal → return path
+
+    for each neighbor of node:
+      if neighbor not visited:
+        parent[neighbor] ← node
+        queue.enqueue(neighbor)
+
+  return NO PATH`,
+      dfs: `DFS(grid, start, goal):
+  stack ← [start]
+  parent ← {start: null}
+  seen ← {}
+
+  while stack not empty:
+    node ← stack.pop()          // LIFO
+    if node in seen → skip
+    seen.add(node)
+    if node = goal → return path
+
+    for each neighbor of node:
+      if neighbor not in parent:
+        parent[neighbor] ← node
+        stack.push(neighbor)
+
+  return NO PATH`,
+      ucs: `UCS(grid, start, goal):
+  heap ← [(0, start)]
+  dist ← {start: 0}
+  parent ← {start: null}
+
+  while heap not empty:
+    (cost, node) ← heap.pop_min()
+    if node = goal → return path
+
+    for each neighbor of node:
+      new_cost ← cost + edge_weight
+      if new_cost < dist[neighbor]:
+        dist[neighbor] ← new_cost
+        parent[neighbor] ← node
+        heap.push((new_cost, neighbor))
+
+  return NO PATH`,
+      dls: `DLS(grid, start, goal, limit):
+  parent ← {start: null}
+  seen ← {}
+
+  function recurse(node, depth):
+    if depth > limit → return false
+    seen.add(node)
+    if node = goal → return true
+
+    for each neighbor of node:
+      if neighbor not in seen:
+        parent[neighbor] ← node
+        if recurse(neighbor, depth+1):
+          return true
+    return false
+
+  recurse(start, 0)`,
+      astar: `A*(grid, start, goal):
+  heap ← [(h(start), 0, start)]
+  g ← {start: 0}
+  parent ← {start: null}
+
+  while heap not empty:
+    (f, cost, node) ← heap.pop_min()
+    if node = goal → return path
+
+    for each neighbor of node:
+      new_g ← cost + edge_weight
+      if new_g < g[neighbor]:
+        g[neighbor] ← new_g
+        parent[neighbor] ← node
+        f ← new_g + h(neighbor, goal)
+        heap.push((f, new_g, neighbor))
+
+  return NO PATH`,
+      greedy: `Greedy(grid, start, goal):
+  heap ← [(h(start, goal), start)]
+  parent ← {start: null}
+
+  while heap not empty:
+    (hval, node) ← heap.pop_min()
+    if node = goal → return path
+
+    for each neighbor of node:
+      if neighbor not visited:
+        parent[neighbor] ← node
+        heap.push((h(neighbor, goal), neighbor))
+
+  return NO PATH`,
+    };
+
+    const TUTORIAL_STEPS = [
+      { title: 'Welcome to PathMind!', text: 'An interactive pathfinding algorithm visualizer. Explore how AI search algorithms find paths through grids with walls, terrain, portals, and more!' },
+      { title: '🧱 Draw Walls', text: 'Click and drag on the grid to draw walls. Walls are impassable barriers that algorithms must navigate around.' },
+      { title: '🏖️ Weighted Terrain', text: 'Use Sand (×3 cost), Water (×5 cost), and Forest (×8 cost) tools to paint terrain. Algorithms like UCS and A* find the cheapest path through weighted terrain.' },
+      { title: '▲ Start & ★ End', text: 'Click the Start and End buttons, then click the grid to place them. Or simply drag the existing start/end markers to reposition.' },
+      { title: '📍 Waypoints', text: 'Add intermediate waypoints that the path must visit in order. Great for simulating real-world routing problems.' },
+      { title: '🌀 Portals', text: 'Create teleportation links! Click two cells in portal mode to connect them. The algorithm can jump between portal pairs instantly.' },
+      { title: '🧠 Choose Algorithm', text: 'Select from 6 different search algorithms in the left panel. Each has different properties — some guarantee optimal paths, others are faster but suboptimal.' },
+      { title: '▶ Visualize', text: 'Click Visualize to watch the algorithm explore the grid step by step. Enable Step-by-Step mode in Settings to advance manually.' },
+      { title: '📊 Benchmark', text: 'Run all algorithms simultaneously and compare their performance side by side. See which one finds the shortest path with the fewest explored nodes.' },
+      { title: '🏆 Challenges', text: 'Try pre-built puzzle scenarios! Each challenge tests your understanding of algorithm behavior in different situations.' },
+      { title: 'You\'re Ready!', text: 'Explore, experiment, and learn! Try the maze generators, import/export grids, take screenshots, and discover how different algorithms think.' },
+    ];
+
+    const CHALLENGES = [
+      {
+        id: 1, name: 'The Zigzag',
+        desc: 'Navigate through alternating gaps in horizontal walls. Which algorithm explores the fewest nodes?',
+        hint: '💡 A* uses its heuristic to skip unnecessary exploration.',
+        rows: 15, cols: 25, start: [0, 1], end: [14, 23],
+        gen(g, R, C) {
+          for (let r = 2; r < R - 1; r += 3) {
+            for (let c = 0; c < C; c++) g[r][c] = 1;
+            g[r][(Math.floor(r / 3) % 2 === 0) ? C - 2 : 1] = 0;
+          }
+        }
+      },
+      {
+        id: 2, name: 'Terrain Valley',
+        desc: 'Bands of sand and water block the direct path. Find the cheapest route, not just the shortest.',
+        hint: '💡 UCS and A* find the lowest-cost path. BFS ignores weights entirely.',
+        rows: 15, cols: 25, start: [7, 0], end: [7, 24],
+        gen(g, R, C) {
+          for (let r = 0; r < R; r++) {
+            for (let c = 8; c < 11; c++) g[r][c] = 2;
+            for (let c = 14; c < 17; c++) g[r][c] = 3;
+          }
+        }
+      },
+      {
+        id: 3, name: 'Dense Maze',
+        desc: 'A tight recursive-division maze. Compare how BFS and DFS explore the paths.',
+        hint: '💡 BFS guarantees the shortest path. DFS may find one quickly, but it won\'t be optimal.',
+        rows: 17, cols: 27, start: [1, 1], end: [15, 25],
+        gen(g, R, C) {
+          for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) g[r][c] = 1;
+          function carve(r, c) {
+            g[r][c] = 0;
+            const dirs = [[-2, 0], [2, 0], [0, -2], [0, 2]].sort(() => Math.random() - 0.5);
+            for (const [dr, dc] of dirs) {
+              const nr = r + dr, nc = c + dc;
+              if (nr > 0 && nr < R - 1 && nc > 0 && nc < C - 1 && g[nr][nc] === 1) {
+                g[r + dr / 2][c + dc / 2] = 0;
+                carve(nr, nc);
+              }
+            }
+          }
+          carve(1, 1); g[1][1] = 0; g[R - 2][C - 2] = 0;
+        }
+      },
+      {
+        id: 4, name: 'Wide Open',
+        desc: 'A mostly open field with a small wall cluster. See which algorithms waste time expanding.',
+        hint: '💡 Greedy rushes straight to the goal. BFS expands equally in all directions.',
+        rows: 20, cols: 30, start: [0, 0], end: [19, 29],
+        gen(g, R, C) {
+          for (let r = 8; r <= 11; r++)
+            for (let c = 13; c <= 16; c++) g[r][c] = 1;
+        }
+      },
+      {
+        id: 5, name: 'No Way Out',
+        desc: 'The goal is completely walled off. Watch how each algorithm handles failure.',
+        hint: '💡 All algorithms must explore extensively before reporting failure.',
+        rows: 15, cols: 25, start: [1, 1], end: [12, 22],
+        gen(g, R, C) {
+          for (let r = 10; r <= 14; r++) { g[r][19] = 1; g[r][24] = 1; }
+          for (let c = 19; c <= 24; c++) { g[10][c] = 1; g[14][c] = 1; }
+        }
+      },
+    ];
+
+    // ── State ──────────────────────────────────────────────────────────────────────
+    let ROWS, COLS, grid = [], cells = [], startNode, endNode;
+    let waypoints = []; // [[r,c], ...]
+    let portals = {};   // {"r,c": [r2,c2], ...}
+    let portalFirst = null; // When placing first of a pair
+
+    let mode = 'wall', mouseDown = false, animating = false, currentAlgo = 'bfs';
+    let dragging = null; // 'start', 'end', or waypoint index
+    let dragWpIdx = -1;
+
+    let diagonal = false;
+    let stepModeEnabled = false;
+    let heatmapEnabled = false;
+    let stepData = null; // {visited, path, stats}
+    let stepIndex = 0;
+    let pseudoOpen = false;
+
+    let undoStack = [];
+    let redoStack = [];
+
+    // ── Grid Setup ─────────────────────────────────────────────────────────────────
+    function gridDims() {
+      const w = window.innerWidth;
+      if (w <= 380) return [14, 20];
+      if (w <= 600) return [16, 24];
+      if (w <= 960) return [18, 28];
+      return [20, 35];
+    }
+
     function init() {
       [ROWS, COLS] = gridDims();
       startNode = [Math.floor(ROWS * .5), Math.floor(COLS * .14)];
       endNode = [Math.floor(ROWS * .5), Math.floor(COLS * .86)];
       grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      waypoints = [];
+      portals = {};
+      portalFirst = null;
+      undoStack = [];
+      redoStack = [];
       buildDOM();
       sel('bfs');
       syncSpeed();
+      updateGridSizeInputs();
+    }
+
+    function updateGridSizeInputs() {
+      const rEl = document.getElementById('grid-rows');
+      const cEl = document.getElementById('grid-cols');
+      if (rEl) rEl.value = ROWS;
+      if (cEl) cEl.value = COLS;
     }
 
     function buildDOM() {
@@ -1386,17 +2222,134 @@
         for (let c = 0; c < COLS; c++) {
           const d = document.createElement('div');
           d.className = 'cell';
-          d.addEventListener('mousedown', e => { e.preventDefault(); mouseDown = true; touch(r, c); });
-          d.addEventListener('mouseenter', () => { if (mouseDown) touch(r, c); });
+          d.addEventListener('mousedown', e => { e.preventDefault(); onMouseDown(r, c); });
+          d.addEventListener('mouseenter', () => { if (mouseDown) onMouseMove(r, c); });
+          d.addEventListener('mouseup', () => { onMouseUp(); });
           el.appendChild(d);
           cells[r][c] = d;
         }
       }
-      document.addEventListener('mouseup', () => mouseDown = false);
+      document.addEventListener('mouseup', () => { onMouseUp(); });
+
       const outer = document.getElementById('grid-outer');
       outer.addEventListener('touchstart', tStart, { passive: false });
       outer.addEventListener('touchmove', tMove, { passive: false });
+      outer.addEventListener('touchend', () => { onMouseUp(); });
       paint();
+    }
+
+    // ── Undo/Redo ──────────────────────────────────────────────────────────────────
+    function saveUndoState() {
+      undoStack.push({
+        grid: grid.map(r => [...r]),
+        startNode: [...startNode],
+        endNode: [...endNode],
+        waypoints: waypoints.map(w => [...w]),
+        portals: JSON.parse(JSON.stringify(portals)),
+      });
+      if (undoStack.length > 50) undoStack.shift();
+      redoStack = [];
+    }
+
+    function undoAction() {
+      if (animating || undoStack.length === 0) return;
+      redoStack.push({
+        grid: grid.map(r => [...r]),
+        startNode: [...startNode],
+        endNode: [...endNode],
+        waypoints: waypoints.map(w => [...w]),
+        portals: JSON.parse(JSON.stringify(portals)),
+      });
+      const state = undoStack.pop();
+      restoreState(state);
+    }
+
+    function redoAction() {
+      if (animating || redoStack.length === 0) return;
+      undoStack.push({
+        grid: grid.map(r => [...r]),
+        startNode: [...startNode],
+        endNode: [...endNode],
+        waypoints: waypoints.map(w => [...w]),
+        portals: JSON.parse(JSON.stringify(portals)),
+      });
+      const state = redoStack.pop();
+      restoreState(state);
+    }
+
+    function restoreState(state) {
+      // Resize if needed
+      if (state.grid.length !== ROWS || state.grid[0].length !== COLS) {
+        ROWS = state.grid.length;
+        COLS = state.grid[0].length;
+        grid = state.grid;
+        startNode = state.startNode;
+        endNode = state.endNode;
+        waypoints = state.waypoints;
+        portals = state.portals;
+        buildDOM();
+      } else {
+        grid = state.grid;
+        startNode = state.startNode;
+        endNode = state.endNode;
+        waypoints = state.waypoints;
+        portals = state.portals;
+        clearViz();
+        paint();
+      }
+      updateGridSizeInputs();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undoAction(); }
+      if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redoAction(); }
+    });
+
+    // ── Mouse / Touch Handlers ─────────────────────────────────────────────────────
+    function onMouseDown(r, c) {
+      if (animating) return;
+      mouseDown = true;
+
+      // Check if clicking on start/end for drag
+      if (mode === 'wall' || mode === 'erase') {
+        if (r === startNode[0] && c === startNode[1]) { dragging = 'start'; return; }
+        if (r === endNode[0] && c === endNode[1]) { dragging = 'end'; return; }
+        // Check waypoints
+        const wIdx = waypoints.findIndex(w => w[0] === r && w[1] === c);
+        if (wIdx >= 0) { dragging = 'waypoint'; dragWpIdx = wIdx; return; }
+      }
+
+      saveUndoState();
+      touch(r, c);
+    }
+
+    function onMouseMove(r, c) {
+      if (animating) return;
+      if (dragging === 'start') {
+        startNode = [r, c];
+        if (grid[r][c] === 1) grid[r][c] = 0;
+        paint();
+        return;
+      }
+      if (dragging === 'end') {
+        endNode = [r, c];
+        if (grid[r][c] === 1) grid[r][c] = 0;
+        paint();
+        return;
+      }
+      if (dragging === 'waypoint') {
+        waypoints[dragWpIdx] = [r, c];
+        if (grid[r][c] === 1) grid[r][c] = 0;
+        paint();
+        return;
+      }
+      touch(r, c);
+    }
+
+    function onMouseUp() {
+      mouseDown = false;
+      dragging = null;
+      dragWpIdx = -1;
     }
 
     let lastTch = null;
@@ -1410,7 +2363,8 @@
       const el = cellAt(e); if (!el) return;
       const i = idxOf(el); if (i < 0) return;
       const r = Math.floor(i / COLS), c = i % COLS;
-      lastTch = `${r},${c}`; touch(r, c);
+      lastTch = `${r},${c}`;
+      onMouseDown(r, c);
     }
     function tMove(e) {
       e.preventDefault();
@@ -1418,32 +2372,142 @@
       const i = idxOf(el); if (i < 0) return;
       const r = Math.floor(i / COLS), c = i % COLS;
       const k = `${r},${c}`; if (k === lastTch) return;
-      lastTch = k; touch(r, c);
+      lastTch = k;
+      onMouseMove(r, c);
     }
 
+    // ── Cell Interaction ───────────────────────────────────────────────────────────
     function touch(r, c) {
       if (animating) return;
-      if (mode === 'start') { startNode = [r, c]; grid[r][c] = 0; paint(); }
-      else if (mode === 'end') { endNode = [r, c]; grid[r][c] = 0; paint(); }
-      else if (!spec(r, c)) { grid[r][c] = mode === 'wall' ? (grid[r][c] === 1 ? 0 : 1) : 0; paintCell(r, c); }
+      if (spec(r, c)) return;
+
+      switch (mode) {
+        case 'start':
+          saveUndoState();
+          startNode = [r, c]; grid[r][c] = 0; paint(); break;
+        case 'end':
+          saveUndoState();
+          endNode = [r, c]; grid[r][c] = 0; paint(); break;
+        case 'wall':
+          grid[r][c] = grid[r][c] === 1 ? 0 : 1;
+          removeSpecialAt(r, c);
+          paintCell(r, c); break;
+        case 'erase':
+          grid[r][c] = 0;
+          removeSpecialAt(r, c);
+          paintCell(r, c); break;
+        case 'sand':
+          grid[r][c] = grid[r][c] === 2 ? 0 : 2;
+          removeSpecialAt(r, c);
+          paintCell(r, c); break;
+        case 'water':
+          grid[r][c] = grid[r][c] === 3 ? 0 : 3;
+          removeSpecialAt(r, c);
+          paintCell(r, c); break;
+        case 'forest':
+          grid[r][c] = grid[r][c] === 4 ? 0 : 4;
+          removeSpecialAt(r, c);
+          paintCell(r, c); break;
+        case 'waypoint':
+          saveUndoState();
+          const wpIdx = waypoints.findIndex(w => w[0] === r && w[1] === c);
+          if (wpIdx >= 0) {
+            waypoints.splice(wpIdx, 1);
+          } else {
+            waypoints.push([r, c]);
+            grid[r][c] = 0;
+          }
+          paint(); break;
+        case 'portal':
+          saveUndoState();
+          const pKey = `${r},${c}`;
+          if (portals[pKey]) {
+            // Remove existing portal pair
+            const dest = portals[pKey];
+            const dKey = `${dest[0]},${dest[1]}`;
+            delete portals[pKey];
+            delete portals[dKey];
+            portalFirst = null;
+            paint();
+          } else if (portalFirst === null) {
+            portalFirst = [r, c];
+            grid[r][c] = 0;
+            paint();
+            setStatus('Portal A placed — click another cell for Portal B.', '');
+          } else {
+            const [pr, pc] = portalFirst;
+            if (pr === r && pc === c) { portalFirst = null; paint(); break; }
+            portals[`${pr},${pc}`] = [r, c];
+            portals[`${r},${c}`] = [pr, pc];
+            grid[r][c] = 0;
+            portalFirst = null;
+            paint();
+            setStatus('Portal pair created!', 'ok');
+          }
+          break;
+      }
     }
+
+    function removeSpecialAt(r, c) {
+      // Remove waypoint or portal at this position
+      const wIdx = waypoints.findIndex(w => w[0] === r && w[1] === c);
+      if (wIdx >= 0) waypoints.splice(wIdx, 1);
+      const pKey = `${r},${c}`;
+      if (portals[pKey]) {
+        const dest = portals[pKey];
+        delete portals[`${dest[0]},${dest[1]}`];
+        delete portals[pKey];
+      }
+    }
+
     function spec(r, c) { return (r === startNode[0] && c === startNode[1]) || (r === endNode[0] && c === endNode[1]); }
-    function paint() { for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) paintCell(r, c); }
-    function paintCell(r, c) {
-      const el = cells[r][c]; el.className = 'cell';
-      if (r === startNode[0] && c === startNode[1]) el.classList.add('start');
-      else if (r === endNode[0] && c === endNode[1]) el.classList.add('end');
-      else if (grid[r][c] === 1) el.classList.add('wall');
+
+    function paint() {
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) paintCell(r, c);
     }
+
+    function paintCell(r, c) {
+      const el = cells[r][c];
+      el.className = 'cell';
+      el.removeAttribute('data-wp-num');
+
+      if (r === startNode[0] && c === startNode[1]) { el.classList.add('start'); return; }
+      if (r === endNode[0] && c === endNode[1]) { el.classList.add('end'); return; }
+
+      // Waypoint?
+      const wIdx = waypoints.findIndex(w => w[0] === r && w[1] === c);
+      if (wIdx >= 0) { el.classList.add('waypoint'); el.setAttribute('data-wp-num', wIdx + 1); return; }
+
+      // Portal?
+      if (portals[`${r},${c}`]) { el.classList.add('portal'); return; }
+      // Pending portal first
+      if (portalFirst && portalFirst[0] === r && portalFirst[1] === c) { el.classList.add('portal'); return; }
+
+      // Terrain
+      if (grid[r][c] === 1) el.classList.add('wall');
+      else if (grid[r][c] === 2) el.classList.add('sand');
+      else if (grid[r][c] === 3) el.classList.add('water');
+      else if (grid[r][c] === 4) el.classList.add('forest');
+    }
+
+    // ── Tool Mode ──────────────────────────────────────────────────────────────────
+    const MODE_CLASSES = {
+      wall: 'wall-active', erase: 'erase-active', start: 'go-active', end: 'stop-active',
+      sand: 'sand-active', water: 'water-active', forest: 'forest-active',
+      waypoint: 'waypoint-active', portal: 'portal-active',
+    };
 
     function setMode(m) {
       mode = m;
-      document.getElementById('tool-wall').className = 't-btn wall-mode' + (m === 'wall' ? ' active' : '');
-      document.getElementById('tool-erase').className = 't-btn erase-mode' + (m === 'erase' ? ' active' : '');
-      document.getElementById('tool-start').className = 't-btn go-mode' + (m === 'start' ? ' active' : '');
-      document.getElementById('tool-end').className = 't-btn stop-mode' + (m === 'end' ? ' active' : '');
+      portalFirst = null; // cancel pending portal
+      const tools = ['wall', 'erase', 'start', 'end', 'sand', 'water', 'forest', 'waypoint', 'portal'];
+      tools.forEach(t => {
+        const btn = document.getElementById(`tool-${t}`);
+        if (btn) btn.className = 't-btn' + (t === m ? ` ${MODE_CLASSES[t]}` : '');
+      });
     }
 
+    // ── Mobile Menu ────────────────────────────────────────────────────────────────
     function toggleMenu() {
       document.getElementById('left-panel').classList.toggle('open');
       document.getElementById('backdrop').classList.toggle('open');
@@ -1455,6 +2519,7 @@
       }
     }
 
+    // ── Algorithm Selection ────────────────────────────────────────────────────────
     function sel(algo) {
       currentAlgo = algo;
       const info = ALGOS[algo];
@@ -1468,23 +2533,28 @@
       document.getElementById('hdr-algo-name').textContent = info.name;
 
       document.getElementById('info-card').innerHTML = `
-    <div class="algo-title-display" style="color:${info.dot}">${info.name}</div>
-    <div class="algo-desc">${info.desc}</div>
-    <div class="complexity-row">
-      <div class="cx-card"><div class="cx-label">Structure</div><div class="cx-val">${info.ds}</div></div>
-      <div class="cx-card"><div class="cx-label">Time</div><div class="cx-val">${info.time}</div></div>
-      <div class="cx-card"><div class="cx-label">Space</div><div class="cx-val">${info.space}</div></div>
-      <div class="cx-card">
-        <div class="cx-label">Properties</div>
-        <div class="prop-row" style="margin-top:4px">
-          <span class="prop-pill ${info.opt ? 'prop-yes' : 'prop-no'}">${info.opt ? '✓' : '✗'} Optimal</span>
+        <div class="algo-title-display" style="color:${info.dot}">${info.name}</div>
+        <div class="algo-desc">${info.desc}</div>
+        <div class="complexity-row">
+          <div class="cx-card"><div class="cx-label">Structure</div><div class="cx-val">${info.ds}</div></div>
+          <div class="cx-card"><div class="cx-label">Time</div><div class="cx-val">${info.time}</div></div>
+          <div class="cx-card"><div class="cx-label">Space</div><div class="cx-val">${info.space}</div></div>
+          <div class="cx-card">
+            <div class="cx-label">Properties</div>
+            <div class="prop-row" style="margin-top:4px">
+              <span class="prop-pill ${info.opt ? 'prop-yes' : 'prop-no'}">${info.opt ? '✓' : '✗'} Optimal</span>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-    <div class="tag-row">${info.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
-  `;
+        <div class="tag-row">${info.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
+      `;
+
+      // Update pseudocode
+      const pEl = document.getElementById('pseudo-code');
+      if (pEl) pEl.textContent = PSEUDOCODE[algo] || '';
     }
 
+    // ── Speed ──────────────────────────────────────────────────────────────────────
     document.getElementById('speed').addEventListener('input', syncSpeed);
     function syncSpeed() {
       const v = +document.getElementById('speed').value;
@@ -1496,6 +2566,90 @@
       return Math.round(75 * Math.pow(1 - v / 100, 1.6));
     }
 
+    // ── Diagonal Toggle ────────────────────────────────────────────────────────────
+    function toggleDiagonal() {
+      diagonal = document.getElementById('diagonal-toggle').checked;
+    }
+
+    // ── Step Mode ──────────────────────────────────────────────────────────────────
+    function toggleStepMode() {
+      stepModeEnabled = document.getElementById('step-toggle').checked;
+      document.getElementById('step-controls').classList.toggle('visible', stepModeEnabled);
+      if (!stepModeEnabled) { stepData = null; stepIndex = 0; }
+    }
+
+    function stepFirst() { if (!stepData) return; stepIndex = 0; renderStep(); }
+    function stepPrev() { if (!stepData || stepIndex <= 0) return; stepIndex--; renderStep(); }
+    function stepNext() {
+      if (!stepData) return;
+      const maxIdx = stepData.visited.length + (stepData.path.length || 0);
+      if (stepIndex >= maxIdx) return;
+      stepIndex++;
+      renderStep();
+    }
+    function stepLast() {
+      if (!stepData) return;
+      stepIndex = stepData.visited.length + (stepData.path.length || 0);
+      renderStep();
+    }
+
+    function renderStep() {
+      if (!stepData) return;
+      // Clear all visited/path classes
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++)
+          cells[r][c].classList.remove('visited', 'path', 'heatmap');
+
+      const vLen = stepData.visited.length;
+      const showVisited = Math.min(stepIndex, vLen);
+
+      for (let i = 0; i < showVisited; i++) {
+        const [r, c] = stepData.visited[i];
+        if (!spec(r, c) && !isWaypoint(r, c) && !isPortal(r, c)) {
+          if (heatmapEnabled) {
+            cells[r][c].classList.add('heatmap');
+            cells[r][c].style.background = heatColor(i, vLen);
+          } else {
+            cells[r][c].classList.add('visited');
+          }
+        }
+      }
+
+      if (stepIndex > vLen && stepData.path.length > 0) {
+        const showPath = stepIndex - vLen;
+        for (let i = 0; i < Math.min(showPath, stepData.path.length); i++) {
+          const [r, c] = stepData.path[i];
+          if (!spec(r, c) && !isWaypoint(r, c) && !isPortal(r, c)) {
+            cells[r][c].classList.remove('visited', 'heatmap');
+            cells[r][c].style.background = '';
+            cells[r][c].classList.add('path');
+          }
+        }
+      }
+
+      sv('s-nodes', showVisited);
+      sv('ms-nodes', showVisited);
+      const total = vLen + (stepData.path.length || 0);
+      document.getElementById('step-label').textContent = `Step ${stepIndex} / ${total}`;
+    }
+
+    // ── Heatmap ────────────────────────────────────────────────────────────────────
+    function toggleHeatmap() {
+      heatmapEnabled = document.getElementById('heatmap-toggle').checked;
+    }
+
+    function heatColor(idx, total) {
+      const t = total <= 1 ? 0 : idx / (total - 1);
+      // Blue → Cyan → Green → Yellow → Red
+      let r, g, b;
+      if (t < 0.25) { const s = t / 0.25; r = 0; g = Math.round(128 * s); b = Math.round(255 * (1 - s) + 128 * s); }
+      else if (t < 0.5) { const s = (t - 0.25) / 0.25; r = 0; g = Math.round(128 + 127 * s); b = Math.round(128 * (1 - s)); }
+      else if (t < 0.75) { const s = (t - 0.5) / 0.25; r = Math.round(255 * s); g = 255; b = 0; }
+      else { const s = (t - 0.75) / 0.25; r = 255; g = Math.round(255 * (1 - s)); b = 0; }
+      return `rgba(${r},${g},${b},0.6)`;
+    }
+
+    // ── Solve ──────────────────────────────────────────────────────────────────────
     async function runSolve() {
       if (animating) return;
       clearViz();
@@ -1503,14 +2657,28 @@
       btn.disabled = true; animating = true;
       document.getElementById('grid-outer').classList.add('solving');
       setStatus('Computing…', '');
+
       try {
         const res = await fetch('/api/solve', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ grid, start: startNode, end: endNode, algorithm: currentAlgo, limit: +document.getElementById('dls-limit').value || 25 })
+          body: JSON.stringify({
+            grid, start: startNode, end: endNode, algorithm: currentAlgo,
+            limit: +document.getElementById('dls-limit').value || 25,
+            diagonal, portals, waypoints
+          })
         });
         const data = await res.json();
         if (data.error) { setStatus(`Error: ${data.error}`, 'fail'); return; }
-        await animate(data.visited, data.path, data.stats);
+
+        if (stepModeEnabled) {
+          stepData = data;
+          stepIndex = 0;
+          renderStep();
+          setStatus('Step mode — use controls to advance.', '');
+          updateStats(data.stats);
+        } else {
+          await animate(data.visited, data.path, data.stats);
+        }
       } catch (e) {
         setStatus('Connection error — is Flask running on port 5000?', 'fail');
       } finally {
@@ -1522,20 +2690,62 @@
     async function animate(visited, path, stats) {
       const d = delay();
       if (d === 0) {
-        visited.forEach(([r, c]) => { if (!spec(r, c)) cells[r][c].classList.add('visited'); });
+        visited.forEach(([r, c], i) => {
+          if (!spec(r, c) && !isWaypoint(r, c) && !isPortal(r, c)) {
+            if (heatmapEnabled) {
+              cells[r][c].classList.add('heatmap');
+              cells[r][c].style.background = heatColor(i, visited.length);
+            } else {
+              cells[r][c].classList.add('visited');
+            }
+          }
+        });
       } else {
         for (let i = 0; i < visited.length; i++) {
           await sl(d);
           const [r, c] = visited[i];
-          if (!spec(r, c)) cells[r][c].classList.add('visited');
+          if (!spec(r, c) && !isWaypoint(r, c) && !isPortal(r, c)) {
+            if (heatmapEnabled) {
+              cells[r][c].classList.add('heatmap');
+              cells[r][c].style.background = heatColor(i, visited.length);
+            } else {
+              cells[r][c].classList.add('visited');
+            }
+          }
           sv('s-nodes', i + 1); sv('ms-nodes', i + 1);
         }
       }
       await sl(d === 0 ? 10 : 280);
+      updateStats(stats);
 
+      if (!stats.found) { setStatus('No path — try removing some walls.', 'fail'); return; }
+      setStatus(`Tracing ${stats.pathLength} steps…`, '');
+
+      if (d === 0) {
+        path.forEach(([r, c]) => {
+          if (!spec(r, c) && !isWaypoint(r, c) && !isPortal(r, c)) {
+            cells[r][c].classList.remove('visited', 'heatmap');
+            cells[r][c].style.background = '';
+            cells[r][c].classList.add('path');
+          }
+        });
+      } else {
+        for (const [r, c] of path) {
+          await sl(28);
+          if (!spec(r, c) && !isWaypoint(r, c) && !isPortal(r, c)) {
+            cells[r][c].classList.remove('visited', 'heatmap');
+            cells[r][c].style.background = '';
+            cells[r][c].classList.add('path');
+          }
+        }
+      }
+      setStatus(`Done — ${stats.nodesExplored} explored · ${stats.pathLength} steps · ${stats.timeMs}ms`, 'ok');
+    }
+
+    function updateStats(stats) {
       sv('s-nodes', stats.nodesExplored); sv('ms-nodes', stats.nodesExplored);
       sv('s-path', stats.found ? stats.pathLength : '—'); sv('ms-path', stats.found ? stats.pathLength : '—');
-      sv('s-time', stats.timeMs < 1 ? `${stats.timeMs}ms` : `${stats.timeMs}ms`); sv('ms-time', `${stats.timeMs}ms`);
+      sv('s-time', `${stats.timeMs}ms`); sv('ms-time', `${stats.timeMs}ms`);
 
       const fe = document.getElementById('s-found'), mf = document.getElementById('ms-found');
       if (stats.found) {
@@ -1546,17 +2756,34 @@
         mf.textContent = '✗'; mf.className = 'm-stat-v stop';
       }
 
-      if (!stats.found) { setStatus('No path — try removing some walls.', 'fail'); return; }
-      setStatus(`Tracing ${stats.pathLength} steps…`, '');
-
-      if (d === 0) {
-        path.forEach(([r, c]) => { if (!spec(r, c)) { cells[r][c].classList.remove('visited'); cells[r][c].classList.add('path'); } });
-      } else {
-        for (const [r, c] of path) { await sl(28); if (!spec(r, c)) { cells[r][c].classList.remove('visited'); cells[r][c].classList.add('path'); } }
-      }
-      setStatus(`Done — ${stats.nodesExplored} explored · ${stats.pathLength} steps · ${stats.timeMs}ms`, 'ok');
+      // Efficiency score
+      showEfficiency(stats);
     }
 
+    function showEfficiency(stats) {
+      const badge = document.getElementById('eff-badge');
+      const valEl = document.getElementById('eff-value');
+      const gradeEl = document.getElementById('eff-grade');
+      if (!stats.found) {
+        badge.classList.remove('visible');
+        return;
+      }
+      // Efficiency = path cells / explored cells (higher = better)
+      const eff = stats.nodesExplored > 0 ? Math.round((stats.pathLength / stats.nodesExplored) * 100) : 0;
+      let grade, color;
+      if (eff >= 60) { grade = 'Excellent — Laser focused'; color = 'var(--go)'; }
+      else if (eff >= 35) { grade = 'Good — Efficient exploration'; color = 'var(--path)'; }
+      else if (eff >= 15) { grade = 'Fair — Moderate exploration'; color = 'var(--hi)'; }
+      else { grade = 'Low — Extensive exploration'; color = 'var(--stop)'; }
+
+      valEl.textContent = `${eff}%`;
+      valEl.style.color = color;
+      gradeEl.textContent = grade;
+      gradeEl.style.color = color;
+      badge.classList.add('visible');
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────────
     const sl = ms => new Promise(r => setTimeout(r, ms));
     function sv(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
     function setStatus(msg, cls) {
@@ -1564,59 +2791,423 @@
       if (!el) return; el.textContent = msg;
       el.className = 'status-strip' + (cls ? ` ${cls}` : '');
     }
+    function isWaypoint(r, c) { return waypoints.some(w => w[0] === r && w[1] === c); }
+    function isPortal(r, c) { return !!portals[`${r},${c}`] || (portalFirst && portalFirst[0] === r && portalFirst[1] === c); }
 
     function clearViz() {
       if (animating) return;
-      for (let r = 0; r < ROWS; r++)for (let c = 0; c < COLS; c++)cells[r][c].classList.remove('visited', 'path');
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        cells[r][c].classList.remove('visited', 'path', 'heatmap');
+        cells[r][c].style.background = '';
+      }
+      paint(); // repaint terrain/waypoints/portals
       ['s-nodes', 's-path', 's-time', 'ms-nodes', 'ms-path', 'ms-time'].forEach(id => sv(id, '—'));
       const fe = document.getElementById('s-found'); if (fe) { fe.textContent = '—'; fe.className = 'stat-num'; }
       const mf = document.getElementById('ms-found'); if (mf) { mf.textContent = '—'; mf.className = 'm-stat-v'; }
+      document.getElementById('eff-badge').classList.remove('visible');
       setStatus('Draw walls · set start & end · hit Visualize.', '');
+      stepData = null; stepIndex = 0;
+      if (stepModeEnabled) document.getElementById('step-label').textContent = 'Step 0 / 0';
     }
 
     function resetAll() {
       if (animating) return;
+      saveUndoState();
       grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      waypoints = [];
+      portals = {};
+      portalFirst = null;
       clearViz(); paint();
     }
 
+    // ── Grid Resize ────────────────────────────────────────────────────────────────
+    function resizeGrid() {
+      if (animating) return;
+      const newR = Math.max(5, Math.min(50, parseInt(document.getElementById('grid-rows').value) || 20));
+      const newC = Math.max(5, Math.min(80, parseInt(document.getElementById('grid-cols').value) || 35));
+      saveUndoState();
+      ROWS = newR;
+      COLS = newC;
+      grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      startNode = [Math.floor(ROWS * .5), Math.floor(COLS * .14)];
+      endNode = [Math.floor(ROWS * .5), Math.floor(COLS * .86)];
+      waypoints = [];
+      portals = {};
+      portalFirst = null;
+      buildDOM();
+      updateGridSizeInputs();
+      clearViz();
+    }
+
+    // ── Pseudocode Toggle ──────────────────────────────────────────────────────────
+    function togglePseudo() {
+      pseudoOpen = !pseudoOpen;
+      document.getElementById('pseudo-wrap').classList.toggle('open', pseudoOpen);
+    }
+
+    // ── Maze Generation ────────────────────────────────────────────────────────────
     function generateMaze(type) {
       if (animating) return;
+      saveUndoState();
       clearViz();
       grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
-      if (type === 'random') {
-        for (let r = 0; r < ROWS; r++)for (let c = 0; c < COLS; c++)if (Math.random() < 0.3 && !spec(r, c)) grid[r][c] = 1;
-      } else if (type === 'recursive') {
-        for (let r = 0; r < ROWS; r++)for (let c = 0; c < COLS; c++)grid[r][c] = 1;
-        function carve(r, c) {
-          grid[r][c] = 0;
-          const dirs = [[-2, 0], [2, 0], [0, -2], [0, 2]].sort(() => Math.random() - .5);
-          for (const [dr, dc] of dirs) {
-            const nr = r + dr, nc = c + dc;
-            if (nr > 0 && nr < ROWS - 1 && nc > 0 && nc < COLS - 1 && grid[nr][nc] === 1) { grid[r + dr / 2][c + dc / 2] = 0; carve(nr, nc); }
+      waypoints = [];
+      portals = {};
+      portalFirst = null;
+
+      switch (type) {
+        case 'random':
+          for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+            if (Math.random() < 0.3 && !spec(r, c)) grid[r][c] = 1;
+          break;
+
+        case 'recursive':
+          for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) grid[r][c] = 1;
+          (function carve(r, c) {
+            grid[r][c] = 0;
+            const dirs = [[-2, 0], [2, 0], [0, -2], [0, 2]].sort(() => Math.random() - .5);
+            for (const [dr, dc] of dirs) {
+              const nr = r + dr, nc = c + dc;
+              if (nr > 0 && nr < ROWS - 1 && nc > 0 && nc < COLS - 1 && grid[nr][nc] === 1) {
+                grid[r + dr / 2][c + dc / 2] = 0;
+                carve(nr, nc);
+              }
+            }
+          })(1, 1);
+          ensureAccess();
+          break;
+
+        case 'spiral':
+          for (let r = 2; r < ROWS - 1; r += 4) {
+            for (let c = 0; c < COLS; c++) if (!spec(r, c)) grid[r][c] = 1;
+            grid[r][(Math.floor(r / 4) % 2 === 0) ? COLS - 2 : 1] = 0;
           }
-        }
-        carve(1, 1);
-        [startNode, endNode].forEach(([sr, sc]) => {
-          grid[sr][sc] = 0;
-          [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => { const nr = sr + dr, nc = sc + dc; if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) grid[nr][nc] = 0; });
-        });
-      } else if (type === 'spiral') {
-        for (let r = 2; r < ROWS - 1; r += 4) {
-          for (let c = 0; c < COLS; c++)if (!spec(r, c)) grid[r][c] = 1;
-          grid[r][(Math.floor(r / 4) % 2 === 0) ? COLS - 2 : 1] = 0;
-        }
-        grid[startNode[0]][startNode[1]] = 0; grid[endNode[0]][endNode[1]] = 0;
+          ensureAccess();
+          break;
+
+        case 'prim':
+          for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) grid[r][c] = 1;
+          const walls = [];
+          const inMaze = new Set();
+          function addWalls(r, c) {
+            for (const [dr, dc] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) {
+              const nr = r + dr, nc = c + dc;
+              if (nr > 0 && nr < ROWS - 1 && nc > 0 && nc < COLS - 1 && !inMaze.has(`${nr},${nc}`))
+                walls.push([r, c, nr, nc]);
+            }
+          }
+          grid[1][1] = 0; inMaze.add('1,1'); addWalls(1, 1);
+          while (walls.length) {
+            const idx = Math.floor(Math.random() * walls.length);
+            const [or, oc, nr, nc] = walls.splice(idx, 1)[0];
+            if (!inMaze.has(`${nr},${nc}`)) {
+              grid[Math.floor((or + nr) / 2)][Math.floor((oc + nc) / 2)] = 0;
+              grid[nr][nc] = 0;
+              inMaze.add(`${nr},${nc}`);
+              addWalls(nr, nc);
+            }
+          }
+          ensureAccess();
+          break;
+
+        case 'kruskal':
+          for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) grid[r][c] = 1;
+          const parent = {};
+          function find(x) { return parent[x] === x ? x : (parent[x] = find(parent[x])); }
+          function union(a, b) { parent[find(a)] = find(b); }
+          const cList = [];
+          for (let r = 1; r < ROWS - 1; r += 2) for (let c = 1; c < COLS - 1; c += 2) {
+            grid[r][c] = 0; const k = `${r},${c}`; parent[k] = k; cList.push([r, c]);
+          }
+          const edges = [];
+          for (const [r, c] of cList) {
+            if (r + 2 < ROWS - 1) edges.push([r, c, r + 2, c]);
+            if (c + 2 < COLS - 1) edges.push([r, c, r, c + 2]);
+          }
+          for (let i = edges.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [edges[i], edges[j]] = [edges[j], edges[i]];
+          }
+          for (const [r1, c1, r2, c2] of edges) {
+            if (find(`${r1},${c1}`) !== find(`${r2},${c2}`)) {
+              union(`${r1},${c1}`, `${r2},${c2}`);
+              grid[Math.floor((r1 + r2) / 2)][Math.floor((c1 + c2) / 2)] = 0;
+            }
+          }
+          ensureAccess();
+          break;
+
+        case 'cave':
+          for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+            grid[r][c] = Math.random() < 0.42 ? 1 : 0;
+          for (let iter = 0; iter < 4; iter++) {
+            const next = grid.map(row => [...row]);
+            for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+              let w = 0;
+              for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+                if (dr === 0 && dc === 0) continue;
+                const nr = r + dr, nc = c + dc;
+                if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || grid[nr][nc] === 1) w++;
+              }
+              next[r][c] = w >= 5 ? 1 : 0;
+            }
+            grid = next;
+          }
+          ensureAccess();
+          break;
       }
       paint();
     }
 
+    function ensureAccess() {
+      [startNode, endNode, ...waypoints].forEach(([sr, sc]) => {
+        grid[sr][sc] = 0;
+        for (const [dr, dc] of DIRS_4) {
+          const nr = sr + dr, nc = sc + dc;
+          if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) grid[nr][nc] = 0;
+        }
+      });
+    }
+
+    // ── Benchmark ──────────────────────────────────────────────────────────────────
+    async function runBenchmark() {
+      if (animating) return;
+      document.getElementById('benchmark-modal').classList.add('open');
+      document.getElementById('benchmark-body').innerHTML = '<p style="color:var(--text-2);font-size:13px">Running all algorithms…</p>';
+
+      try {
+        const res = await fetch('/api/benchmark', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ grid, start: startNode, end: endNode, diagonal, portals, limit: +document.getElementById('dls-limit').value || 50 })
+        });
+        const data = await res.json();
+        renderBenchmark(data);
+      } catch (e) {
+        document.getElementById('benchmark-body').innerHTML = '<p style="color:var(--stop)">Connection error — is Flask running?</p>';
+      }
+    }
+
+    function renderBenchmark(data) {
+      const names = { bfs: 'BFS', dfs: 'DFS', ucs: 'UCS', dls: 'DLS', astar: 'A*', greedy: 'Greedy' };
+      const algos = ['bfs', 'dfs', 'ucs', 'dls', 'astar', 'greedy'];
+      let maxNodes = 1;
+      algos.forEach(a => { if (data[a] && data[a].nodesExplored > maxNodes) maxNodes = data[a].nodesExplored; });
+
+      // Find best (found path, fewest nodes)
+      let bestAlgo = null, bestNodes = Infinity;
+      algos.forEach(a => {
+        if (data[a] && data[a].found && data[a].nodesExplored < bestNodes) {
+          bestNodes = data[a].nodesExplored;
+          bestAlgo = a;
+        }
+      });
+
+      let html = `<table class="bench-table">
+        <thead><tr><th>Algorithm</th><th>Nodes</th><th>Path</th><th>Time</th><th>Result</th></tr></thead><tbody>`;
+
+      for (const a of algos) {
+        const r = data[a];
+        if (!r) continue;
+        const isBest = a === bestAlgo;
+        const foundStr = r.error ? `<span class="not-found">Error</span>` : (r.found ? `<span class="${isBest ? 'best' : ''}" style="color:var(--go)">✓ Found</span>` : `<span class="not-found">✗ No path</span>`);
+        const barW = maxNodes > 0 ? Math.round((r.nodesExplored / maxNodes) * 100) : 0;
+        html += `<tr>
+          <td class="algo-name" style="color:${ALGOS[a].dot}">${names[a]}${isBest ? ' 🏆' : ''}</td>
+          <td>${r.nodesExplored}<div class="bench-bar" style="width:${barW}%;${isBest ? 'background:var(--go)' : ''}"></div></td>
+          <td>${r.found ? r.pathLength : '—'}</td>
+          <td>${r.timeMs}ms</td>
+          <td>${foundStr}</td>
+        </tr>`;
+      }
+      html += '</tbody></table>';
+      document.getElementById('benchmark-body').innerHTML = html;
+    }
+
+    function closeBenchmark() { document.getElementById('benchmark-modal').classList.remove('open'); }
+
+    // ── Challenges ─────────────────────────────────────────────────────────────────
+    function openChallenges() {
+      const body = document.getElementById('challenge-body');
+      let html = '<div class="challenge-list">';
+      CHALLENGES.forEach(ch => {
+        html += `<div class="challenge-card" onclick="loadChallenge(${ch.id})">
+          <div class="challenge-name">${ch.name}</div>
+          <div class="challenge-desc">${ch.desc}</div>
+          <div class="challenge-hint">${ch.hint}</div>
+        </div>`;
+      });
+      html += '</div>';
+      body.innerHTML = html;
+      document.getElementById('challenge-modal').classList.add('open');
+    }
+
+    function loadChallenge(id) {
+      const ch = CHALLENGES.find(c => c.id === id);
+      if (!ch) return;
+      saveUndoState();
+      ROWS = ch.rows;
+      COLS = ch.cols;
+      grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      startNode = [...ch.start];
+      endNode = [...ch.end];
+      waypoints = [];
+      portals = {};
+      portalFirst = null;
+      ch.gen(grid, ROWS, COLS);
+      // Make sure start/end are clear
+      grid[startNode[0]][startNode[1]] = 0;
+      grid[endNode[0]][endNode[1]] = 0;
+      buildDOM();
+      updateGridSizeInputs();
+      clearViz();
+      closeChallenges();
+      setStatus(`Challenge: ${ch.name} — try different algorithms!`, '');
+    }
+
+    function closeChallenges() { document.getElementById('challenge-modal').classList.remove('open'); }
+
+    // ── Tutorial ───────────────────────────────────────────────────────────────────
+    let tutorialStep = 0;
+
+    function openTutorial() {
+      tutorialStep = 0;
+      renderTutorialStep();
+      document.getElementById('tutorial-overlay').classList.add('open');
+    }
+
+    function closeTutorial() {
+      document.getElementById('tutorial-overlay').classList.remove('open');
+    }
+
+    function tutorialPrev() {
+      if (tutorialStep > 0) { tutorialStep--; renderTutorialStep(); }
+    }
+
+    function tutorialNext() {
+      if (tutorialStep < TUTORIAL_STEPS.length - 1) { tutorialStep++; renderTutorialStep(); }
+      else closeTutorial();
+    }
+
+    function renderTutorialStep() {
+      const step = TUTORIAL_STEPS[tutorialStep];
+      document.getElementById('tutorial-step-num').textContent = `Step ${tutorialStep + 1} of ${TUTORIAL_STEPS.length}`;
+      document.getElementById('tutorial-title').textContent = step.title;
+      document.getElementById('tutorial-text').textContent = step.text;
+      document.getElementById('tutorial-prev').style.display = tutorialStep === 0 ? 'none' : '';
+      document.getElementById('tutorial-next').textContent = tutorialStep === TUTORIAL_STEPS.length - 1 ? 'Finish ✓' : 'Next →';
+    }
+
+    // ── Import / Export ────────────────────────────────────────────────────────────
+    function exportGrid() {
+      const data = {
+        rows: ROWS, cols: COLS, grid, start: startNode, end: endNode,
+        waypoints, portals, version: 2
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'pathmind-grid.json'; a.click();
+      URL.revokeObjectURL(url);
+      setStatus('Grid exported!', 'ok');
+    }
+
+    function importGrid() {
+      document.getElementById('file-input').click();
+    }
+
+    function handleImport(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          saveUndoState();
+          ROWS = data.rows || data.grid.length;
+          COLS = data.cols || data.grid[0].length;
+          grid = data.grid;
+          startNode = data.start || [0, 0];
+          endNode = data.end || [ROWS - 1, COLS - 1];
+          waypoints = data.waypoints || [];
+          portals = data.portals || {};
+          portalFirst = null;
+          buildDOM();
+          updateGridSizeInputs();
+          clearViz();
+          setStatus('Grid imported successfully!', 'ok');
+        } catch (err) {
+          setStatus('Import failed — invalid JSON file.', 'fail');
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = ''; // Allow re-import of same file
+    }
+
+    // ── Screenshot ─────────────────────────────────────────────────────────────────
+    function screenshot() {
+      const cs = 18;
+      const gap = 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = COLS * (cs + gap) + gap;
+      canvas.height = ROWS * (cs + gap) + gap;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = dark ? '#252320' : '#c8c3b8';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const colors = {
+        empty: dark ? '#1a1814' : '#ede9e1',
+        wall: dark ? '#3d3a35' : '#b0aba0',
+        sand: dark ? '#c9a044' : '#e8c96a',
+        water: dark ? '#3d7ea8' : '#4a9ece',
+        forest: dark ? '#1f6b3a' : '#2d8a4e',
+        start: dark ? '#22c55e' : '#1a7a4a',
+        end: dark ? '#ef4444' : '#c0321a',
+        waypoint: '#8b5cf6',
+        portal: '#ec4899',
+        visited: dark ? 'rgba(255,85,51,0.15)' : 'rgba(232,56,13,0.18)',
+        path: dark ? '#fbbf24' : '#d97706',
+      };
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const x = c * (cs + gap) + gap;
+          const y = r * (cs + gap) + gap;
+          let color = colors.empty;
+
+          if (r === startNode[0] && c === startNode[1]) color = colors.start;
+          else if (r === endNode[0] && c === endNode[1]) color = colors.end;
+          else if (isWaypoint(r, c)) color = colors.waypoint;
+          else if (isPortal(r, c)) color = colors.portal;
+          else if (cells[r][c].classList.contains('path')) color = colors.path;
+          else if (cells[r][c].classList.contains('visited') || cells[r][c].classList.contains('heatmap')) color = colors.visited;
+          else if (grid[r][c] === 1) color = colors.wall;
+          else if (grid[r][c] === 2) color = colors.sand;
+          else if (grid[r][c] === 3) color = colors.water;
+          else if (grid[r][c] === 4) color = colors.forest;
+
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, cs, cs);
+        }
+      }
+
+      canvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'pathmind-screenshot.png'; a.click();
+        URL.revokeObjectURL(url);
+      });
+      setStatus('Screenshot saved!', 'ok');
+    }
+
+    // ── Resize handler ─────────────────────────────────────────────────────────────
     let resizeT;
     window.addEventListener('resize', () => {
       clearTimeout(resizeT);
       resizeT = setTimeout(() => { if (!animating) init(); }, 250);
     });
 
+    // ── Init ───────────────────────────────────────────────────────────────────────
     init();
   </script>
 </body>

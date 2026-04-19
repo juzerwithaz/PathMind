@@ -1,20 +1,59 @@
 from flask import Flask, render_template, request, jsonify
 from collections import deque
 import heapq, time, sys
-sys.setrecursionlimit(1000)
+
+sys.setrecursionlimit(2000)
 
 app = Flask(__name__)
 
+# ── Constants ──────────────────────────────────────────────────────────────────
 
-DIRS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+DIRS_4 = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+DIRS_8 = DIRS_4 + [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+
+# Grid cell types: 0=empty, 1=wall, 2=sand, 3=water, 4=forest
+TERRAIN_COST = {0: 1, 2: 3, 3: 5, 4: 8}
 
 
-def get_neighbors(grid, r, c):
-    rows, cols = len(grid), len(grid[0])
-    for dr, dc in DIRS:
+# ── Helpers ────────────────────────────────────────────────────────────────────
+
+def get_neighbors(grid, r, c, diag=False, portals=None):
+    """Yield valid neighbor coordinates, optionally with diagonal & portal support."""
+    R, C = len(grid), len(grid[0])
+    for dr, dc in (DIRS_8 if diag else DIRS_4):
         nr, nc = r + dr, c + dc
-        if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] != 1:
+        if 0 <= nr < R and 0 <= nc < C and grid[nr][nc] != 1:
+            # Prevent diagonal corner-cutting through walls
+            if abs(dr) + abs(dc) == 2:
+                if grid[r + dr][c] == 1 or grid[r][c + dc] == 1:
+                    continue
             yield (nr, nc)
+    # Portal teleportation
+    if portals:
+        key = f"{r},{c}"
+        if key in portals:
+            pr, pc = portals[key]
+            if 0 <= pr < R and 0 <= pc < C and grid[pr][pc] != 1:
+                yield (pr, pc)
+
+
+def move_cost(grid, r1, c1, r2, c2):
+    """Cost to move from (r1,c1) to (r2,c2)."""
+    base = TERRAIN_COST.get(grid[r2][c2], 1)
+    d = abs(r2 - r1) + abs(c2 - c1)
+    if d == 2:          # diagonal move
+        return base * 1.414
+    if d > 2:           # portal jump (flat cost)
+        return 1.0
+    return float(base)  # cardinal move
+
+
+def heuristic(a, b, diag=False):
+    """Manhattan (cardinal) or Chebyshev (diagonal) heuristic."""
+    dr, dc = abs(a[0] - b[0]), abs(a[1] - b[1])
+    if diag:
+        return max(dr, dc) + 0.414 * min(dr, dc)
+    return dr + dc
 
 
 def reconstruct(parent, start, end):
@@ -28,9 +67,9 @@ def reconstruct(parent, start, end):
     return path if path and path[0] == list(start) else []
 
 
-# ── Uninformed Search ──────────────────────────────────────────────────────────
+# ── Search Algorithms ──────────────────────────────────────────────────────────
 
-def bfs(grid, s, e):
+def bfs(grid, s, e, diag=False, portals=None):
     """Breadth-First Search — Queue (FIFO). Optimal for unweighted graphs."""
     queue = deque([s])
     parent = {s: None}
@@ -40,14 +79,14 @@ def bfs(grid, s, e):
         order.append(list(u))
         if u == e:
             break
-        for v in get_neighbors(grid, *u):
+        for v in get_neighbors(grid, *u, diag=diag, portals=portals):
             if v not in parent:
                 parent[v] = u
                 queue.append(v)
     return order, reconstruct(parent, s, e)
 
 
-def dfs(grid, s, e):
+def dfs(grid, s, e, diag=False, portals=None):
     """Depth-First Search — Stack (LIFO). Not guaranteed optimal."""
     stack = [s]
     parent = {s: None}
@@ -61,14 +100,14 @@ def dfs(grid, s, e):
         order.append(list(u))
         if u == e:
             break
-        for v in get_neighbors(grid, *u):
+        for v in get_neighbors(grid, *u, diag=diag, portals=portals):
             if v not in parent:
                 parent[v] = u
                 stack.append(v)
     return order, reconstruct(parent, s, e)
 
 
-def ucs(grid, s, e):
+def ucs(grid, s, e, diag=False, portals=None):
     """Uniform Cost Search — Priority Queue (min-heap). Dijkstra on grid."""
     heap = [(0, s)]
     dist = {s: 0}
@@ -76,16 +115,15 @@ def ucs(grid, s, e):
     order = []
     seen = set()
     while heap:
-        cost, u = heapq.heappop(heap)
+        g, u = heapq.heappop(heap)
         if u in seen:
             continue
         seen.add(u)
         order.append(list(u))
         if u == e:
             break
-        for v in get_neighbors(grid, *u):
-            step_cost = grid[v[0]][v[1]] if grid[v[0]][v[1]] > 1 else 1
-            nc = cost + step_cost
+        for v in get_neighbors(grid, *u, diag=diag, portals=portals):
+            nc = g + move_cost(grid, u[0], u[1], v[0], v[1])
             if v not in dist or nc < dist[v]:
                 dist[v] = nc
                 parent[v] = u
@@ -93,7 +131,7 @@ def ucs(grid, s, e):
     return order, reconstruct(parent, s, e)
 
 
-def dls(grid, s, e, limit):
+def dls(grid, s, e, limit, diag=False, portals=None):
     """Depth-Limited Search — DFS with a hard depth cutoff."""
     parent = {s: None}
     order = []
@@ -106,7 +144,7 @@ def dls(grid, s, e, limit):
         order.append(list(u))
         if u == e:
             return True
-        for v in get_neighbors(grid, *u):
+        for v in get_neighbors(grid, *u, diag=diag, portals=portals):
             if v not in seen:
                 parent[v] = u
                 if recurse(v, depth + 1):
@@ -117,15 +155,9 @@ def dls(grid, s, e, limit):
     return order, reconstruct(parent, s, e)
 
 
-# ── Informed Search ────────────────────────────────────────────────────────────
-
-def manhattan(a, b):
-    return abs(a[0] - b[0]) + abs(a[1] - b[1])
-
-
-def astar(grid, s, e):
+def astar(grid, s, e, diag=False, portals=None):
     """A* Search — Priority Queue with f(n) = g(n) + h(n). Optimal."""
-    heap = [(manhattan(s, e), 0, s)]
+    heap = [(heuristic(s, e, diag), 0, s)]
     g = {s: 0}
     parent = {s: None}
     order = []
@@ -138,19 +170,18 @@ def astar(grid, s, e):
         order.append(list(u))
         if u == e:
             break
-        for v in get_neighbors(grid, *u):
-            step_cost = grid[v[0]][v[1]] if grid[v[0]][v[1]] > 1 else 1
-            nc = cost + step_cost
+        for v in get_neighbors(grid, *u, diag=diag, portals=portals):
+            nc = cost + move_cost(grid, u[0], u[1], v[0], v[1])
             if v not in g or nc < g[v]:
                 g[v] = nc
                 parent[v] = u
-                heapq.heappush(heap, (nc + manhattan(v, e), nc, v))
+                heapq.heappush(heap, (nc + heuristic(v, e, diag), nc, v))
     return order, reconstruct(parent, s, e)
 
 
-def greedy(grid, s, e):
+def greedy(grid, s, e, diag=False, portals=None):
     """Greedy Best-First — Priority Queue using h(n) only. Not optimal."""
-    heap = [(manhattan(s, e), s)]
+    heap = [(heuristic(s, e, diag), s)]
     parent = {s: None}
     order = []
     seen = set()
@@ -162,14 +193,14 @@ def greedy(grid, s, e):
         order.append(list(u))
         if u == e:
             break
-        for v in get_neighbors(grid, *u):
+        for v in get_neighbors(grid, *u, diag=diag, portals=portals):
             if v not in parent:
                 parent[v] = u
-                heapq.heappush(heap, (manhattan(v, e), v))
+                heapq.heappush(heap, (heuristic(v, e, diag), v))
     return order, reconstruct(parent, s, e)
 
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
+# ── Route helpers ──────────────────────────────────────────────────────────────
 
 ALGOS = {
     'bfs': bfs,
@@ -179,6 +210,15 @@ ALGOS = {
     'greedy': greedy,
 }
 
+
+def _run(algo, grid, s, e, limit, diag, portals):
+    """Run a single algorithm with unified interface."""
+    if algo == 'dls':
+        return dls(grid, s, e, limit, diag=diag, portals=portals)
+    return ALGOS[algo](grid, s, e, diag=diag, portals=portals)
+
+
+# ── Routes ─────────────────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
@@ -193,32 +233,79 @@ def solve():
     end    = tuple(data['end'])
     algo   = data['algorithm']
     limit  = int(data.get('limit', 25))
+    diag   = bool(data.get('diagonal', False))
+    portals = data.get('portals', {})
+    waypoints = [tuple(w) for w in data.get('waypoints', [])]
 
-    t0 = time.perf_counter()
+    if algo not in ALGOS and algo != 'dls':
+        return jsonify({'error': f'Unknown algorithm: {algo}'}), 400
 
-    try:
-        if algo == 'dls':
-            visited, path = dls(grid, start, end, limit)
-        elif algo in ALGOS:
-            visited, path = ALGOS[algo](grid, start, end)
+    # Chain pathfinding through waypoints: start → w1 → w2 → … → end
+    points = [start] + waypoints + [end]
+    all_visited, all_path = [], []
+    total_ms = 0
+
+    for i in range(len(points) - 1):
+        s, e = points[i], points[i + 1]
+        t0 = time.perf_counter()
+        try:
+            visited, path = _run(algo, grid, s, e, limit, diag, portals)
+        except RecursionError:
+            return jsonify({'error': 'Recursion limit hit — reduce depth limit'}), 400
+        total_ms += (time.perf_counter() - t0) * 1000
+
+        all_visited.extend(visited)
+        if path:
+            # Merge path segments, avoiding duplicate junction nodes
+            all_path = (all_path[:-1] if all_path else []) + path
         else:
-            return jsonify({'error': f'Unknown algorithm: {algo}'}), 400
-    except RecursionError:
-        return jsonify({'error': 'Recursion limit hit — reduce depth limit'}), 400
-
-    elapsed_ms = (time.perf_counter() - t0) * 1000
+            all_path = []
+            break
 
     return jsonify({
-        'visited': visited,
-        'path': path,
+        'visited': all_visited,
+        'path': all_path,
         'stats': {
-            'nodesExplored': len(visited),
-            'pathLength':    len(path) - 1 if path else 0,
-            'timeMs':        round(elapsed_ms, 3),
-            'found':         len(path) > 0,
+            'nodesExplored': len(all_visited),
+            'pathLength':    len(all_path) - 1 if all_path else 0,
+            'timeMs':        round(total_ms, 3),
+            'found':         len(all_path) > 0,
             'optimal':       algo in ('bfs', 'ucs', 'astar'),
         }
     })
+
+
+@app.route('/api/benchmark', methods=['POST'])
+def benchmark():
+    """Run all algorithms on the same grid and return comparative stats."""
+    data = request.json
+    grid    = data['grid']
+    start   = tuple(data['start'])
+    end     = tuple(data['end'])
+    diag    = bool(data.get('diagonal', False))
+    portals = data.get('portals', {})
+    limit   = int(data.get('limit', 50))
+
+    results = {}
+    for algo in ['bfs', 'dfs', 'ucs', 'dls', 'astar', 'greedy']:
+        t0 = time.perf_counter()
+        try:
+            visited, path = _run(algo, grid, start, end, limit, diag, portals)
+            elapsed = (time.perf_counter() - t0) * 1000
+            results[algo] = {
+                'nodesExplored': len(visited),
+                'pathLength':    len(path) - 1 if path else 0,
+                'timeMs':        round(elapsed, 3),
+                'found':         len(path) > 0,
+                'optimal':       algo in ('bfs', 'ucs', 'astar'),
+            }
+        except RecursionError:
+            results[algo] = {
+                'nodesExplored': 0, 'pathLength': 0,
+                'timeMs': 0, 'found': False, 'optimal': False,
+                'error': 'Recursion limit',
+            }
+    return jsonify(results)
 
 
 if __name__ == '__main__':

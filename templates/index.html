@@ -1596,17 +1596,17 @@
       align-items: center;
       background: var(--paper2);
       border: 1px solid var(--rule);
-      padding: 16px;
+      padding: 10px;
       border-radius: 12px;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: var(--s-sm);
-      width: 100%;
+      flex: 1 1 30%;
+      min-width: 250px;
       box-sizing: border-box;
       overflow: auto;
       max-height: 600px;
-      width: 100%;
       min-height: 0;
-}
+    }
     .c-grid-container:hover {
       box-shadow: var(--s-md);
       border-color: var(--rule2);
@@ -1638,19 +1638,20 @@
     }
     #compare-grid-wrap {
       display: none;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-      gap: 20px;
-      overflow-y: auto;
-      padding: 20px;
-      align-items: start;
       width: 100%;
       flex: 1;
+      flex-wrap: wrap;
+      gap: 10px;
+      overflow-y: auto;
+      justify-content: center;
+      padding: 20px;
+      align-items: start;
       min-height: 0;
       box-sizing: border-box;
     }
     @media (max-width: 900px) {
       #compare-grid-wrap {
-        grid-template-columns: 1fr;
+        flex-direction: column;
       }
     }
 
@@ -1810,6 +1811,12 @@
          <button class="solve-btn" id="compare-btn-auto" onclick="runComparePathfinding()">▶ Auto Race</button>
          <button class="t-btn" onclick="closeCompareMode()">⊘ Exit Compare</button>
          <div class="t-sep"></div>
+         <div class="speed-wrap" id="compare-speed-wrap">
+           <span>Speed</span>
+           <input type="range" id="compare-speed" min="1" max="100" value="65" oninput="syncBothSpeeds(this)">
+           <span id="compare-speed-lbl">Fast</span>
+         </div>
+         <div class="t-sep"></div>
          <span style="font-size:10px;font-weight:700;color:var(--text-3);">Algos:</span>
          <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-bfs" checked onchange="if(!animating) renderCompareGrids()"> BFS</label>
          <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-ucs" checked onchange="if(!animating) renderCompareGrids()"> UCS</label>
@@ -1869,13 +1876,6 @@
       </div>
 
       <!-- Grid -->
-      <div id="compare-results" style="display:none; margin:10px 20px; padding:15px; background:var(--paper2); border:1px solid var(--rule); flex-shrink:0;">
-        <table class="bench-table" id="compare-results-table">
-          <thead><tr><th>Rank</th><th>Algorithm</th><th>Time (ms)</th><th>Explored</th><th>Path</th></tr></thead>
-          <tbody id="compare-results-tbody"></tbody>
-        </table>
-      </div>
-
       <div class="grid-wrap" id="main-grid-wrap">
         <div class="grid-outer" id="grid-outer">
           <div id="grid"></div>
@@ -1883,6 +1883,13 @@
       </div>
 
       <div class="grid-wrap" id="compare-grid-wrap"></div>
+
+      <div id="compare-results" style="display:none; margin:10px 20px 20px; padding:15px; background:var(--paper2); border:1px solid var(--rule); flex-shrink:0; align-self:center; min-width:80%; max-width:90%;">
+        <table class="bench-table" id="compare-results-table">
+          <thead><tr><th>Rank</th><th>Algorithm</th><th>Time (ms)</th><th>Explored</th><th>Path</th></tr></thead>
+          <tbody id="compare-results-tbody"></tbody>
+        </table>
+      </div>
 
       <!-- Mobile stats -->
       <div class="m-stats">
@@ -2735,10 +2742,18 @@
     }
 
     // ── Speed ──────────────────────────────────────────────────────────────────────
-    document.getElementById('speed').addEventListener('input', syncSpeed);
-    function syncSpeed() {
-      const v = +document.getElementById('speed').value;
-      document.getElementById('speed-lbl').textContent = v < 25 ? 'Slow' : v < 55 ? 'Med' : v < 85 ? 'Fast' : 'Max';
+    document.getElementById('speed').addEventListener('input', function() { syncBothSpeeds(this); });
+    function syncBothSpeeds(el) {
+      if(!el) el = document.getElementById('speed');
+      const v = +el.value;
+      const lbl = v < 25 ? 'Slow' : v < 55 ? 'Med' : v < 85 ? 'Fast' : 'Max';
+      
+      document.getElementById('speed').value = v;
+      document.getElementById('speed-lbl').textContent = lbl;
+      if (document.getElementById('compare-speed')) {
+        document.getElementById('compare-speed').value = v;
+        document.getElementById('compare-speed-lbl').textContent = lbl;
+      }
     }
     function delay() {
       const v = +document.getElementById('speed').value;
@@ -2876,7 +2891,7 @@
       document.getElementById('main-toolbar-2').style.display = 'none';
       document.getElementById('compare-toolbar').style.display = 'flex';
       document.getElementById('main-grid-wrap').style.display = 'none';
-      document.getElementById('compare-grid-wrap').style.display = 'grid';
+      document.getElementById('compare-grid-wrap').style.display = 'flex';
       document.getElementById('compare-results').style.display = 'none';
       document.getElementById('step-controls').classList.remove('visible');
       
@@ -3104,7 +3119,6 @@
         });
         const resultsEl = document.getElementById('compare-results');
         resultsEl.style.display = 'block';
-        document.getElementById('compare-grid-wrap').prepend(resultsEl); 
         setStatus("Race complete!", "ok");
 
       } catch (e) {

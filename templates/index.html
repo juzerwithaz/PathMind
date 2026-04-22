@@ -2639,23 +2639,36 @@
       el.className = 'cell';
       el.removeAttribute('data-wp-num');
 
-      if (r === startNode[0] && c === startNode[1]) { el.classList.add('start'); return; }
-      if (r === endNode[0] && c === endNode[1]) { el.classList.add('end'); return; }
+      let isDone = false;
+      if (r === startNode[0] && c === startNode[1]) { el.classList.add('start'); isDone = true; }
+      if (!isDone && r === endNode[0] && c === endNode[1]) { el.classList.add('end'); isDone = true; }
 
-      // Waypoint?
       const wIdx = waypoints.findIndex(w => w[0] === r && w[1] === c);
-      if (wIdx >= 0) { el.classList.add('waypoint'); el.setAttribute('data-wp-num', wIdx + 1); return; }
+      if (!isDone && wIdx >= 0) { el.classList.add('waypoint'); el.setAttribute('data-wp-num', wIdx + 1); isDone = true; }
 
-      // Portal?
-      if (portals[`${r},${c}`]) { el.classList.add('portal'); return; }
-      // Pending portal first
-      if (portalFirst && portalFirst[0] === r && portalFirst[1] === c) { el.classList.add('portal'); return; }
+      if (!isDone && portals[`${r},${c}`]) { el.classList.add('portal'); isDone = true; }
+      if (!isDone && portalFirst && portalFirst[0] === r && portalFirst[1] === c) { el.classList.add('portal'); isDone = true; }
 
-      // Terrain
-      if (grid[r][c] === 1) el.classList.add('wall');
-      else if (grid[r][c] === 2) el.classList.add('sand');
-      else if (grid[r][c] === 3) el.classList.add('water');
-      else if (grid[r][c] === 4) el.classList.add('forest');
+      if (!isDone) {
+        if (grid[r][c] === 1) el.classList.add('wall');
+        else if (grid[r][c] === 2) el.classList.add('sand');
+        else if (grid[r][c] === 3) el.classList.add('water');
+        else if (grid[r][c] === 4) el.classList.add('forest');
+      }
+
+      if (typeof isCompareMode !== 'undefined' && isCompareMode && typeof compareData !== 'undefined') {
+        compareData.forEach(d => {
+          if (d.cells && d.cells[r] && d.cells[r][c]) {
+            const cel = d.cells[r][c];
+            cel.className = el.className;
+            if (el.hasAttribute('data-wp-num')) {
+              cel.setAttribute('data-wp-num', el.getAttribute('data-wp-num'));
+            } else {
+              cel.removeAttribute('data-wp-num');
+            }
+          }
+        });
+      }
     }
 
     // ── Tool Mode ──────────────────────────────────────────────────────────────────
@@ -2884,7 +2897,7 @@
 
     // ── Compare Mode ───────────────────────────────────────────────────────────────
     function toggleCompareMode() {
-      if (animating) return;
+      animating = false;
       isCompareMode = true;
       document.getElementById('main-algo-strip').style.display = 'none';
       document.getElementById('main-toolbar-1').style.display = 'none';
@@ -2903,7 +2916,7 @@
     }
 
     function closeCompareMode() {
-      if (animating) return;
+      animating = false;
       isCompareMode = false;
       document.getElementById('main-algo-strip').style.display = 'flex';
       document.getElementById('main-toolbar-1').style.display = 'flex';
@@ -3017,7 +3030,8 @@
     }
 
     async function runComparePathfinding() {
-      if (animating) return;
+      animating = false;
+      renderCompareGrids();
       const algos = getSelectedCompareAlgos();
       if (algos.length < 2) { setStatus("Select at least 2 algorithms.", "fail"); return; }
       
@@ -3398,6 +3412,9 @@
           break;
       }
       paint();
+      if (typeof isCompareMode !== 'undefined' && isCompareMode) {
+        renderCompareGrids();
+      }
     }
 
     function ensureAccess() {

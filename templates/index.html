@@ -1816,6 +1816,11 @@
            <input type="range" id="compare-speed" min="1" max="100" value="65" oninput="syncBothSpeeds(this)">
            <span id="compare-speed-lbl">Fast</span>
          </div>
+         <div class="dls-wrap" id="compare-dls-wrap" style="display:none;">
+           <div class="t-sep"></div>
+           <span>Limit</span>
+           <input type="number" id="compare-dls-limit" value="25" min="1" max="150" oninput="document.getElementById('dls-limit').value = this.value">
+         </div>
          <div class="t-sep"></div>
          <span style="font-size:10px;font-weight:700;color:var(--text-3);">Algos:</span>
          <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-bfs" checked onchange="if(!animating) renderCompareGrids()"> BFS</label>
@@ -1823,7 +1828,7 @@
          <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-astar" checked onchange="if(!animating) renderCompareGrids()"> A*</label>
          <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-dfs" onchange="if(!animating) renderCompareGrids()"> DFS</label>
          <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-greedy" onchange="if(!animating) renderCompareGrids()"> Greedy</label>
-         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-dls" onchange="if(!animating) renderCompareGrids()"> DLS</label>
+         <label style="font-size:10px;font-weight:700;"><input type="checkbox" id="c-dls" onchange="if(!animating) renderCompareGrids(); document.getElementById('compare-dls-wrap').style.display = this.checked ? 'flex' : 'none';"> DLS</label>
       </div>
 
       <!-- Toolbar 1: Drawing tools -->
@@ -1839,6 +1844,9 @@
         <div class="t-sep"></div>
         <button class="t-btn" id="tool-waypoint" onclick="setMode('waypoint')">📍 Waypoint</button>
         <button class="t-btn" id="tool-portal" onclick="setMode('portal')">🌀 Portal</button>
+        <div class="t-sep compare-only-tool" style="display:none;"></div>
+        <button class="t-btn compare-only-tool active" id="tool-all-grids" style="display:none;" onclick="setCompareDrawMode('all')">✦ All Grids</button>
+        <button class="t-btn compare-only-tool" id="tool-this-grid" style="display:none;" onclick="setCompareDrawMode('single')">◈ This Grid Only</button>
         <div class="t-sep"></div>
         <button class="t-btn" onclick="undoAction()" title="Undo (Ctrl+Z)">↶</button>
         <button class="t-btn" onclick="redoAction()" title="Redo (Ctrl+Y)">↷</button>
@@ -1858,7 +1866,7 @@
         <div class="dls-wrap" id="dls-wrap">
           <div class="t-sep"></div>
           <span>Limit</span>
-          <input type="number" id="dls-limit" value="25" min="1" max="150">
+          <input type="number" id="dls-limit" value="25" min="1" max="150" oninput="if(document.getElementById('compare-dls-limit')) document.getElementById('compare-dls-limit').value = this.value">
         </div>
         <div class="t-sep"></div>
         <label class="toggle-row" title="Allow 8-directional movement">
@@ -2403,6 +2411,19 @@
       outer.addEventListener('touchstart', tStart, { passive: false });
       outer.addEventListener('touchmove', tMove, { passive: false });
       outer.addEventListener('touchend', () => { onMouseUp(); });
+      
+      // Document level touch listeners for compare grids
+      document.addEventListener('touchstart', (e) => {
+        if (!e.target.closest('#grid-outer') && e.target.closest('.c-grid-container')) {
+           tStart(e);
+        }
+      }, { passive: false });
+      document.addEventListener('touchmove', (e) => {
+        if (!e.target.closest('#grid-outer') && e.target.closest('.c-grid-container')) {
+           tMove(e);
+        }
+      }, { passive: false });
+      
       paint();
     }
 
@@ -2474,44 +2495,100 @@
     });
 
     // ── Mouse / Touch Handlers ─────────────────────────────────────────────────────
-    function onMouseDown(r, c) {
+    let compareDrawMode = 'all';
+
+    function setCompareDrawMode(modeStr) {
+      compareDrawMode = modeStr;
+      document.getElementById('tool-all-grids').classList.toggle('active', modeStr === 'all');
+      document.getElementById('tool-this-grid').classList.toggle('active', modeStr === 'single');
+    }
+
+    function getContexts(algo) {
+      const glob = {
+        isGlobal: true,
+        grid: grid,
+        startNode: startNode,
+        endNode: endNode,
+        waypoints: waypoints,
+        portals: portals,
+        portalFirst: portalFirst,
+        paint: () => paint(),
+        paintCell: (r, c) => paintCell(r, c)
+      };
+      
+      if (!isCompareMode) return [glob];
+      
+      if (compareDrawMode === 'single' && algo) {
+        const cData = compareData.find(d => d.algo === algo);
+        return cData ? [cData] : [glob];
+      }
+      
+      return [glob, ...compareData];
+    }
+    
+    function specCtx(ctx, r, c) {
+      return (r === ctx.startNode[0] && c === ctx.startNode[1]) || (r === ctx.endNode[0] && c === ctx.endNode[1]);
+    }
+
+    function removeSpecialAtCtx(ctx, r, c) {
+      const wIdx = ctx.waypoints.findIndex(w => w[0] === r && w[1] === c);
+      if (wIdx >= 0) ctx.waypoints.splice(wIdx, 1);
+      const pKey = `${r},${c}`;
+      if (ctx.portals[pKey]) {
+        const dest = ctx.portals[pKey];
+        delete ctx.portals[`${dest[0]},${dest[1]}`];
+        delete ctx.portals[pKey];
+      }
+    }
+
+    function onMouseDown(r, c, algo) {
       if (animating) return;
       mouseDown = true;
 
+      const contexts = getContexts(algo);
+      const ctx = contexts[0]; // first writable context
+      
       // Check if clicking on start/end for drag
       if (mode === 'wall' || mode === 'erase') {
-        if (r === startNode[0] && c === startNode[1]) { dragging = 'start'; return; }
-        if (r === endNode[0] && c === endNode[1]) { dragging = 'end'; return; }
+        if (r === ctx.startNode[0] && c === ctx.startNode[1]) { dragging = 'start'; return; }
+        if (r === ctx.endNode[0] && c === ctx.endNode[1]) { dragging = 'end'; return; }
         // Check waypoints
-        const wIdx = waypoints.findIndex(w => w[0] === r && w[1] === c);
+        const wIdx = ctx.waypoints.findIndex(w => w[0] === r && w[1] === c);
         if (wIdx >= 0) { dragging = 'waypoint'; dragWpIdx = wIdx; return; }
       }
 
-      saveUndoState();
-      touch(r, c);
+      if (contexts.some(c => c.isGlobal)) saveUndoState();
+      touch(r, c, algo);
     }
 
-    function onMouseMove(r, c) {
+    function onMouseMove(r, c, algo) {
       if (animating) return;
-      if (dragging === 'start') {
-        startNode = [r, c];
-        if (grid[r][c] === 1) grid[r][c] = 0;
-        paint();
+      if (dragging === 'start' || dragging === 'end' || dragging === 'waypoint') {
+        const contexts = getContexts(algo);
+        contexts.forEach(ctx => {
+           if (dragging === 'start') {
+               ctx.startNode = [r, c];
+               if (ctx.grid[r][c] === 1) ctx.grid[r][c] = 0;
+           } else if (dragging === 'end') {
+               ctx.endNode = [r, c];
+               if (ctx.grid[r][c] === 1) ctx.grid[r][c] = 0;
+           } else if (dragging === 'waypoint') {
+               if (ctx.waypoints[dragWpIdx]) {
+                   ctx.waypoints[dragWpIdx] = [r, c];
+                   if (ctx.grid[r][c] === 1) ctx.grid[r][c] = 0;
+               }
+           }
+           ctx.paint();
+        });
+        
+        const glob = contexts.find(c => c.isGlobal);
+        if (glob) {
+           startNode = glob.startNode;
+           endNode = glob.endNode;
+        }
         return;
       }
-      if (dragging === 'end') {
-        endNode = [r, c];
-        if (grid[r][c] === 1) grid[r][c] = 0;
-        paint();
-        return;
-      }
-      if (dragging === 'waypoint') {
-        waypoints[dragWpIdx] = [r, c];
-        if (grid[r][c] === 1) grid[r][c] = 0;
-        paint();
-        return;
-      }
-      touch(r, c);
+      touch(r, c, algo);
     }
 
     function onMouseUp() {
@@ -2525,107 +2602,122 @@
       const t = e.touches[0], el = document.elementFromPoint(t.clientX, t.clientY);
       return el && el.classList.contains('cell') ? el : null;
     }
-    function idxOf(el) { return [...document.querySelectorAll('.cell')].indexOf(el); }
+    function getCellCoords(el) {
+       const parent = el.parentElement;
+       const children = Array.from(parent.children);
+       const i = children.indexOf(el);
+       if (i < 0) return null;
+       return { r: Math.floor(i / COLS), c: i % COLS };
+    }
+    function getAlgoFromEl(el) {
+      const p = el.closest('[data-algo]');
+      return p ? p.getAttribute('data-algo') : undefined;
+    }
     function tStart(e) {
       e.preventDefault(); lastTch = null;
       const el = cellAt(e); if (!el) return;
-      const i = idxOf(el); if (i < 0) return;
-      const r = Math.floor(i / COLS), c = i % COLS;
-      lastTch = `${r},${c}`;
-      onMouseDown(r, c);
+      const coords = getCellCoords(el); if (!coords) return;
+      const { r, c } = coords;
+      const algo = getAlgoFromEl(el);
+      lastTch = `${r},${c},${algo}`;
+      onMouseDown(r, c, algo);
     }
     function tMove(e) {
       e.preventDefault();
       const el = cellAt(e); if (!el) return;
-      const i = idxOf(el); if (i < 0) return;
-      const r = Math.floor(i / COLS), c = i % COLS;
-      const k = `${r},${c}`; if (k === lastTch) return;
+      const coords = getCellCoords(el); if (!coords) return;
+      const { r, c } = coords;
+      const algo = getAlgoFromEl(el);
+      const k = `${r},${c},${algo}`; if (k === lastTch) return;
       lastTch = k;
-      onMouseMove(r, c);
+      onMouseMove(r, c, algo);
     }
 
     // ── Cell Interaction ───────────────────────────────────────────────────────────
-    function touch(r, c) {
+    function touch(r, c, algo) {
       if (animating) return;
-      if (spec(r, c)) return;
+      
+      const contexts = getContexts(algo);
+      
+      contexts.forEach(ctx => {
+        if (specCtx(ctx, r, c)) return;
 
-      switch (mode) {
-        case 'start':
-          saveUndoState();
-          startNode = [r, c]; grid[r][c] = 0; paint(); break;
-        case 'end':
-          saveUndoState();
-          endNode = [r, c]; grid[r][c] = 0; paint(); break;
-        case 'wall':
-          grid[r][c] = grid[r][c] === 1 ? 0 : 1;
-          removeSpecialAt(r, c);
-          paintCell(r, c); break;
-        case 'erase':
-          grid[r][c] = 0;
-          removeSpecialAt(r, c);
-          paintCell(r, c); break;
-        case 'sand':
-          grid[r][c] = grid[r][c] === 2 ? 0 : 2;
-          removeSpecialAt(r, c);
-          paintCell(r, c); break;
-        case 'water':
-          grid[r][c] = grid[r][c] === 3 ? 0 : 3;
-          removeSpecialAt(r, c);
-          paintCell(r, c); break;
-        case 'forest':
-          grid[r][c] = grid[r][c] === 4 ? 0 : 4;
-          removeSpecialAt(r, c);
-          paintCell(r, c); break;
-        case 'waypoint':
-          saveUndoState();
-          const wpIdx = waypoints.findIndex(w => w[0] === r && w[1] === c);
-          if (wpIdx >= 0) {
-            waypoints.splice(wpIdx, 1);
-          } else {
-            waypoints.push([r, c]);
-            grid[r][c] = 0;
-          }
-          paint(); break;
-        case 'portal':
-          saveUndoState();
-          const pKey = `${r},${c}`;
-          if (portals[pKey]) {
-            // Remove existing portal pair
-            const dest = portals[pKey];
-            const dKey = `${dest[0]},${dest[1]}`;
-            delete portals[pKey];
-            delete portals[dKey];
-            portalFirst = null;
-            paint();
-          } else if (portalFirst === null) {
-            portalFirst = [r, c];
-            grid[r][c] = 0;
-            paint();
-            setStatus('Portal A placed — click another cell for Portal B.', '');
-          } else {
-            const [pr, pc] = portalFirst;
-            if (pr === r && pc === c) { portalFirst = null; paint(); break; }
-            portals[`${pr},${pc}`] = [r, c];
-            portals[`${r},${c}`] = [pr, pc];
-            grid[r][c] = 0;
-            portalFirst = null;
-            paint();
-            setStatus('Portal pair created!', 'ok');
-          }
-          break;
+        switch (mode) {
+          case 'start':
+            if (ctx.isGlobal) saveUndoState();
+            ctx.startNode = [r, c]; ctx.grid[r][c] = 0; ctx.paint(); break;
+          case 'end':
+            if (ctx.isGlobal) saveUndoState();
+            ctx.endNode = [r, c]; ctx.grid[r][c] = 0; ctx.paint(); break;
+          case 'wall':
+            ctx.grid[r][c] = ctx.grid[r][c] === 1 ? 0 : 1;
+            removeSpecialAtCtx(ctx, r, c);
+            ctx.paintCell(r, c); break;
+          case 'erase':
+            ctx.grid[r][c] = 0;
+            removeSpecialAtCtx(ctx, r, c);
+            ctx.paintCell(r, c); break;
+          case 'sand':
+            ctx.grid[r][c] = ctx.grid[r][c] === 2 ? 0 : 2;
+            removeSpecialAtCtx(ctx, r, c);
+            ctx.paintCell(r, c); break;
+          case 'water':
+            ctx.grid[r][c] = ctx.grid[r][c] === 3 ? 0 : 3;
+            removeSpecialAtCtx(ctx, r, c);
+            ctx.paintCell(r, c); break;
+          case 'forest':
+            ctx.grid[r][c] = ctx.grid[r][c] === 4 ? 0 : 4;
+            removeSpecialAtCtx(ctx, r, c);
+            ctx.paintCell(r, c); break;
+          case 'waypoint':
+            if (ctx.isGlobal) saveUndoState();
+            const wpIdx = ctx.waypoints.findIndex(w => w[0] === r && w[1] === c);
+            if (wpIdx >= 0) {
+              ctx.waypoints.splice(wpIdx, 1);
+            } else {
+              ctx.waypoints.push([r, c]);
+              ctx.grid[r][c] = 0;
+            }
+            ctx.paint(); break;
+          case 'portal':
+            if (ctx.isGlobal) saveUndoState();
+            const pKey = `${r},${c}`;
+            if (ctx.portals[pKey]) {
+              const dest = ctx.portals[pKey];
+              const dKey = `${dest[0]},${dest[1]}`;
+              delete ctx.portals[pKey];
+              delete ctx.portals[dKey];
+              ctx.portalFirst = null;
+              ctx.paint();
+            } else if (ctx.portalFirst === null) {
+              ctx.portalFirst = [r, c];
+              ctx.grid[r][c] = 0;
+              ctx.paint();
+              if (ctx.isGlobal) setStatus('Portal A placed — click another cell for Portal B.', '');
+            } else {
+              const [pr, pc] = ctx.portalFirst;
+              if (pr === r && pc === c) { ctx.portalFirst = null; ctx.paint(); break; }
+              ctx.portals[`${pr},${pc}`] = [r, c];
+              ctx.portals[`${r},${c}`] = [pr, pc];
+              ctx.grid[r][c] = 0;
+              ctx.portalFirst = null;
+              ctx.paint();
+              if (ctx.isGlobal) setStatus('Portal pair created!', 'ok');
+            }
+            break;
+        }
+      });
+      
+      const glob = contexts.find(c => c.isGlobal);
+      if (glob) {
+         startNode = glob.startNode;
+         endNode = glob.endNode;
+         portalFirst = glob.portalFirst;
       }
     }
 
     function removeSpecialAt(r, c) {
-      // Remove waypoint or portal at this position
-      const wIdx = waypoints.findIndex(w => w[0] === r && w[1] === c);
-      if (wIdx >= 0) waypoints.splice(wIdx, 1);
-      const pKey = `${r},${c}`;
-      if (portals[pKey]) {
-        const dest = portals[pKey];
-        delete portals[`${dest[0]},${dest[1]}`];
-        delete portals[pKey];
-      }
+      removeSpecialAtCtx({waypoints, portals}, r, c);
     }
 
     function spec(r, c) { return (r === startNode[0] && c === startNode[1]) || (r === endNode[0] && c === endNode[1]); }
@@ -2655,19 +2747,29 @@
         else if (grid[r][c] === 3) el.classList.add('water');
         else if (grid[r][c] === 4) el.classList.add('forest');
       }
+    }
 
-      if (typeof isCompareMode !== 'undefined' && isCompareMode && typeof compareData !== 'undefined') {
-        compareData.forEach(d => {
-          if (d.cells && d.cells[r] && d.cells[r][c]) {
-            const cel = d.cells[r][c];
-            cel.className = el.className;
-            if (el.hasAttribute('data-wp-num')) {
-              cel.setAttribute('data-wp-num', el.getAttribute('data-wp-num'));
-            } else {
-              cel.removeAttribute('data-wp-num');
-            }
-          }
-        });
+    function paintCompareCell(r, c, cData) {
+      if (!cData || !cData.cells || !cData.cells[r] || !cData.cells[r][c]) return;
+      const el = cData.cells[r][c];
+      el.className = 'cell';
+      el.removeAttribute('data-wp-num');
+
+      let isDone = false;
+      if (r === cData.startNode[0] && c === cData.startNode[1]) { el.classList.add('start'); isDone = true; }
+      if (!isDone && r === cData.endNode[0] && c === cData.endNode[1]) { el.classList.add('end'); isDone = true; }
+
+      const wIdx = cData.waypoints.findIndex(w => w[0] === r && w[1] === c);
+      if (!isDone && wIdx >= 0) { el.classList.add('waypoint'); el.setAttribute('data-wp-num', wIdx + 1); isDone = true; }
+
+      if (!isDone && cData.portals[`${r},${c}`]) { el.classList.add('portal'); isDone = true; }
+      if (!isDone && cData.portalFirst && cData.portalFirst[0] === r && cData.portalFirst[1] === c) { el.classList.add('portal'); isDone = true; }
+
+      if (!isDone) {
+        if (cData.grid[r][c] === 1) el.classList.add('wall');
+        else if (cData.grid[r][c] === 2) el.classList.add('sand');
+        else if (cData.grid[r][c] === 3) el.classList.add('water');
+        else if (cData.grid[r][c] === 4) el.classList.add('forest');
       }
     }
 
@@ -2900,7 +3002,8 @@
       animating = false;
       isCompareMode = true;
       document.getElementById('main-algo-strip').style.display = 'none';
-      document.getElementById('main-toolbar-1').style.display = 'none';
+      document.getElementById('main-toolbar-1').style.display = 'flex';
+      document.querySelectorAll('.compare-only-tool').forEach(e => e.style.display = 'flex');
       document.getElementById('main-toolbar-2').style.display = 'none';
       document.getElementById('compare-toolbar').style.display = 'flex';
       document.getElementById('main-grid-wrap').style.display = 'none';
@@ -2920,6 +3023,7 @@
       isCompareMode = false;
       document.getElementById('main-algo-strip').style.display = 'flex';
       document.getElementById('main-toolbar-1').style.display = 'flex';
+      document.querySelectorAll('.compare-only-tool').forEach(e => e.style.display = 'none');
       document.getElementById('main-toolbar-2').style.display = 'flex';
       document.getElementById('compare-toolbar').style.display = 'none';
       document.getElementById('main-grid-wrap').style.display = 'flex';
@@ -2996,6 +3100,7 @@
         gridEl.style.gap = '1px';
         gridEl.style.background = 'var(--cell-gap)';
         gridEl.style.width = 'max-content';
+        gridEl.setAttribute('data-algo', algo);
         const cs = getComputedStyle(document.documentElement).getPropertyValue('--cell-size').trim();
         gridEl.style.gridTemplateColumns = `repeat(${COLS}, ${cs})`;
         gridEl.style.gridAutoRows = cs;
@@ -3006,6 +3111,10 @@
           for (let c = 0; c < COLS; c++) {
             const d = document.createElement('div');
             d.className = 'cell';
+            d.addEventListener('mousedown', e => { e.preventDefault(); onMouseDown(r, c, algo); });
+            d.addEventListener('mouseenter', () => { if (mouseDown) onMouseMove(r, c, algo); });
+            d.addEventListener('mouseup', () => { onMouseUp(); });
+            
             // Copy state from main grid
             if (r === startNode[0] && c === startNode[1]) d.classList.add('start');
             else if (r === endNode[0] && c === endNode[1]) d.classList.add('end');
@@ -3025,7 +3134,19 @@
         gridOuter.appendChild(gridEl);
         wrap.appendChild(container);
 
-        compareData.push({ algo, cells: algoCells, visited: [], path: [], stats: null });
+        const cData = { 
+            algo, cells: algoCells, 
+            grid: grid.map(r => [...r]), 
+            startNode: [...startNode], 
+            endNode: [...endNode], 
+            waypoints: waypoints.map(w => [...w]), 
+            portals: JSON.parse(JSON.stringify(portals)),
+            portalFirst: null,
+            visited: [], path: [], stats: null 
+        };
+        cData.paintCell = (r, c) => paintCompareCell(r, c, cData);
+        cData.paint = () => { for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) cData.paintCell(r, c); };
+        compareData.push(cData);
       });
     }
 
@@ -3041,12 +3162,19 @@
       
       try {
         const promises = algos.map(async algo => {
+          const cData = compareData.find(d => d.algo === algo);
+          const gridToSend = cData ? cData.grid : grid;
+          const startToSend = cData ? cData.startNode : startNode;
+          const endToSend = cData ? cData.endNode : endNode;
+          const portalsToSend = cData ? cData.portals : portals;
+          const waypointsToSend = cData ? cData.waypoints : waypoints;
+          
           const res = await fetch('/api/solve', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              grid, start: startNode, end: endNode, algorithm: algo,
-              limit: +document.getElementById('dls-limit').value || 25,
-              diagonal, portals, waypoints
+              grid: gridToSend, start: startToSend, end: endToSend, algorithm: algo,
+              limit: +document.getElementById('compare-dls-limit').value || 25,
+              diagonal, portals: portalsToSend, waypoints: waypointsToSend
             })
           });
           const data = await res.json();

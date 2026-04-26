@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PathMind — AI Pathfinding Visualizer</title>
+  <title>AlgoMind — PathMind</title>
   <meta name="description" content="Interactive pathfinding algorithm visualizer with BFS, DFS, UCS, DLS, A*, Greedy. Features weighted terrain, portals, waypoints, benchmarking and more.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
@@ -1729,11 +1729,11 @@
   <!-- ── Header ─────────────────────────────────────────────────── -->
   <header>
     <div class="logo-block">
-      <span class="logo-text">PathMind</span>
+      <span class="logo-text">AlgoMind</span>
       <div class="logo-dot"></div>
     </div>
 
-    <a href="/" class="hdr-btn" style="text-decoration: none; border-left: none; border-right: 1px solid color-mix(in srgb, var(--hdr-fg) 10%, transparent); background: color-mix(in srgb, var(--hdr-fg) 6%, transparent); color: var(--hdr-fg);">Pathfinding</a>
+    <a href="/" class="hdr-btn" style="text-decoration: none; border-left: none; border-right: 1px solid color-mix(in srgb, var(--hdr-fg) 10%, transparent); background: color-mix(in srgb, var(--hdr-fg) 6%, transparent); color: var(--hdr-fg);">PathMind</a>
     <a href="/sorting" class="hdr-btn" style="text-decoration: none; border-left: none; border-right: 1px solid color-mix(in srgb, var(--hdr-fg) 10%, transparent);">Sorting</a>
 
     <div class="header-algo-pill">
@@ -2056,7 +2056,7 @@
     <div class="tutorial-card">
       <div class="tutorial-step-num" id="tutorial-step-num">Step 1 of 10</div>
       <div class="tutorial-title" id="tutorial-title">Welcome</div>
-      <div class="tutorial-text" id="tutorial-text">Welcome to PathMind!</div>
+      <div class="tutorial-text" id="tutorial-text">Welcome to AlgoMind's PathMind module!</div>
       <div class="tutorial-nav">
         <button class="tutorial-btn" onclick="closeTutorial()">Skip</button>
         <button class="tutorial-btn" id="tutorial-prev" onclick="tutorialPrev()">← Back</button>
@@ -2251,7 +2251,7 @@
     };
 
     const TUTORIAL_STEPS = [
-      { title: 'Welcome to PathMind!', text: 'An interactive pathfinding algorithm visualizer. Explore how AI search algorithms find paths through grids with walls, terrain, portals, and more!' },
+      { title: 'Welcome to AlgoMind (PathMind)!', text: 'An interactive pathfinding algorithm visualizer. Explore how AI search algorithms find paths through grids with walls, terrain, portals, and more!' },
       { title: '🧱 Draw Walls', text: 'Click and drag on the grid to draw walls. Walls are impassable barriers that algorithms must navigate around.' },
       { title: '🏖️ Weighted Terrain', text: 'Use Sand (×3 cost), Water (×5 cost), and Forest (×8 cost) tools to paint terrain. Algorithms like UCS and A* find the cheapest path through weighted terrain.' },
       { title: '▲ Start & ★ End', text: 'Click the Start and End buttons, then click the grid to place them. Or simply drag the existing start/end markers to reposition.' },
